@@ -1,0 +1,54 @@
+import { {{pascalCase}}Controller } from "./{{kebabCase}}.controller";
+import { asyncHandler } from "../../../middleware/error-handler";
+import { validateHandler } from "../../../middleware/validate-handler";
+import { BaseRouter } from "../../../base/base-router";
+import { {{pascalCase}}BodySchema, {{pascalCase}}ParamsSchema } from "./{{kebabCase}}.validator";
+import { useFilter } from "../../../middleware/use-filter";
+
+export class {{pascalCase}}Router extends BaseRouter {
+  constructor(private controller: {{pascalCase}}Controller) {
+    super();
+    this.registerRoutes();
+  }
+
+  private registerRoutes() {
+    this.router.get(
+      "/",
+      useFilter(),
+      asyncHandler(
+        async (req, res) => await this.controller.getAll{{pascalCase}}s(req, res),
+      ),
+    );
+
+    this.router.get(
+      "/:{{camelCase}}Id",
+      validateHandler({ params: {{pascalCase}}ParamsSchema }),
+      asyncHandler(
+        async (req, res) => await this.controller.get{{pascalCase}}ById(req, res),
+      ),
+    );
+
+    this.router.post(
+      "/",
+      validateHandler({ body: {{pascalCase}}BodySchema }),
+      asyncHandler(
+        async (req, res) => await this.controller.create{{pascalCase}}(req, res),
+      ),
+    );
+
+    this.router.put(
+      "/:{{camelCase}}Id",
+      validateHandler({ params: {{pascalCase}}ParamsSchema, body: {{pascalCase}}BodySchema }),
+      asyncHandler(
+        async (req, res) => await this.controller.update{{pascalCase}}(req, res),
+      ),
+    );
+    this.router.delete(
+      "/:{{camelCase}}Id",
+      validateHandler({ params: {{pascalCase}}ParamsSchema }),
+      asyncHandler(
+        async (req, res) => await this.controller.delete{{pascalCase}}(req, res),
+      ),
+    );
+  }
+}

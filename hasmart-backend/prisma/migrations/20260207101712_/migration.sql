@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "RecordActionModelType" ADD VALUE 'TRANSACTION_CASH_FLOW';

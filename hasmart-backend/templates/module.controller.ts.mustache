@@ -1,0 +1,41 @@
+import { BaseController } from "../../../base/base-controller";
+import { {{pascalCase}}Service } from "./{{kebabCase}}.service";
+import { Request, Response } from "express";
+import { {{pascalCase}}BodyType, {{pascalCase}}ParamsType } from "./{{kebabCase}}.validator";
+
+export class {{pascalCase}}Controller extends BaseController {
+  constructor(private service: {{pascalCase}}Service) {
+    super();
+  }
+
+  getAll{{pascalCase}}s = async (req: Request, res: Response) => {
+    const filter = req.filterQuery;
+    const { rows, pagination } = await this.service.getAll{{pascalCase}}s(filter);
+    return this.sendList(req, res, rows, pagination, filter);
+  };
+
+  get{{pascalCase}}ById = async (req: Request, res: Response) => {
+    const params = req.params as unknown as {{pascalCase}}ParamsType;
+    const data = await this.service.get{{pascalCase}}ById(params.{{camelCase}}Id);
+    return this.sendOk(req, res, data);
+  };
+
+  create{{pascalCase}} = async (req: Request, res: Response) => {
+    const data = req.body as {{pascalCase}}BodyType;
+    const result = await this.service.create{{pascalCase}}(data);
+    return this.sendOk(req, res, result);
+  };
+
+  update{{pascalCase}} = async (req: Request, res: Response) => {
+    const params = req.params as unknown as {{pascalCase}}ParamsType;
+    const data = req.body as {{pascalCase}}BodyType;
+    const result = await this.service.update{{pascalCase}}(params.{{camelCase}}Id, data);
+    return this.sendOk(req, res, result);
+  };
+
+  delete{{pascalCase}} = async (req: Request, res: Response) => {
+    const params = req.params as unknown as {{pascalCase}}ParamsType;
+    const result = await this.service.delete{{pascalCase}}(params.{{camelCase}}Id);
+    return this.sendOk(req, res, result);
+  };
+}

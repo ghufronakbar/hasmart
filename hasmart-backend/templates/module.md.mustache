@@ -1,0 +1,77 @@
+# {{pascalCase}} Module
+
+Module untuk mengelola data {{kebabCase}}.
+
+---
+
+## Overview
+
+TODO: Add module description
+
+---
+
+## Files
+
+| File | Description |
+|------|-------------|
+| `{{kebabCase}}.controller.ts` | HTTP request/response handlers |
+| `{{kebabCase}}.service.ts` | Business logic & database operations |
+| `{{kebabCase}}.route.ts` | Route definitions |
+| `{{kebabCase}}.validator.ts` | Zod validation schemas |
+
+---
+
+## API Endpoints
+
+### List {{pascalCase}}s
+
+```
+GET /api/{{prefix}}/{{kebabCase}}
+```
+
+### Get {{pascalCase}} by ID
+
+```
+GET /api/{{prefix}}/{{kebabCase}}/:{{camelCase}}Id
+```
+
+### Create {{pascalCase}}
+
+```
+POST /api/{{prefix}}/{{kebabCase}}
+```
+
+### Update {{pascalCase}}
+
+```
+PUT /api/{{prefix}}/{{kebabCase}}/:{{camelCase}}Id
+```
+
+### Delete {{pascalCase}}
+
+```
+DELETE /api/{{prefix}}/{{kebabCase}}/:{{camelCase}}Id
+```
+
+---
+
+## Validation Schema
+
+```typescript
+const {{pascalCase}}BodySchema = z.object({
+  name: z.string(),
+  // TODO: Add more fields
+});
+```
+
+---
+
+## Business Rules
+
+TODO: Add business rules
+
+---
+
+## Database Model
+
+Lihat `prisma/schema.prisma` untuk model `{{pascalCase}}`.

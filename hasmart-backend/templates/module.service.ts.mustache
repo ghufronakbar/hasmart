@@ -1,0 +1,90 @@
+import { BaseService } from "../../../base/base-service";
+import { PrismaService } from "../../common/prisma/prisma.service";
+import { {{pascalCase}}BodyType } from "./{{kebabCase}}.validator";
+import { BadRequestError, NotFoundError } from "../../../utils/error";
+import { FilterQueryType } from "src/middleware/use-filter";
+import { Prisma } from ".prisma/client";
+
+export class {{pascalCase}}Service extends BaseService {
+  constructor(private readonly prisma: PrismaService) {
+    super();
+  }
+
+  private constructWhere(filter?: FilterQueryType): Prisma.{{pascalCase}}WhereInput {
+    const where: Prisma.{{pascalCase}}WhereInput = {
+      deletedAt: null,
+      OR: filter?.search
+        ? [
+            { name: { contains: filter.search, mode: "insensitive" } },
+            // TODO: Add more searchable fields
+          ]
+        : undefined,
+    };
+    return where;
+  }
+
+  private constructArgs(filter?: FilterQueryType): Prisma.{{pascalCase}}FindManyArgs {
+    const args: Prisma.{{pascalCase}}FindManyArgs = {
+      where: this.constructWhere(filter),
+      skip: filter?.skip,
+      take: filter?.limit,
+      orderBy: filter?.sortBy
+        ? {
+            [filter?.sortBy]: filter?.sort,
+          }
+        : undefined,
+    };
+
+    return args;
+  }
+
+  getAll{{pascalCase}}s = async (filter?: FilterQueryType) => {
+    const [rows, count] = await Promise.all([
+      this.prisma.{{camelCase}}.findMany(this.constructArgs(filter)),
+      this.prisma.{{camelCase}}.count({ where: this.constructWhere(filter) }),
+    ]);
+
+    const pagination = this.createPagination({
+      total: count,
+      page: filter?.page || 1,
+      limit: filter?.limit || 10,
+    });
+    return { rows, pagination };
+  };
+
+  get{{pascalCase}}ById = async (id: number) => {
+    const data = await this.prisma.{{camelCase}}.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!data) {
+      throw new NotFoundError();
+    }
+    return data;
+  };
+
+  create{{pascalCase}} = async (data: {{pascalCase}}BodyType) => {
+    // TODO: Add unique check if needed
+    return await this.prisma.{{camelCase}}.create({ data });
+  };
+
+  update{{pascalCase}} = async (id: number, data: {{pascalCase}}BodyType) => {
+    // TODO: Add unique check if needed
+    return await this.prisma.{{camelCase}}.update({
+      where: { id },
+      data,
+    });
+  };
+
+  delete{{pascalCase}} = async (id: number) => {
+    const data = await this.prisma.{{camelCase}}.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!data) {
+      throw new NotFoundError();
+    }
+    return await this.prisma.{{camelCase}}.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+  };
+}

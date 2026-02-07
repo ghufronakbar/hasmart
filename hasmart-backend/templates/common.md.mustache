@@ -1,0 +1,47 @@
+# {{pascalCase}} Module
+
+Common module yang menyediakan {{kebabCase}} service.
+
+---
+
+## Overview
+
+TODO: Add module description
+
+---
+
+## Files
+
+| File | Description |
+|------|-------------|
+| `{{kebabCase}}.service.ts` | Service implementation |
+
+---
+
+## Usage
+
+### 1. Import di bootstrap.ts
+
+```typescript
+import { {{pascalCase}}Service } from "./modules/common/{{kebabCase}}/{{kebabCase}}.service";
+
+const {{camelCase}}Service = new {{pascalCase}}Service();
+```
+
+### 2. Inject ke Service
+
+```typescript
+export class SomeService extends BaseService {
+  constructor(private readonly {{camelCase}}: {{pascalCase}}Service) {
+    super();
+  }
+}
+```
+
+---
+
+## API
+
+### Class: `{{pascalCase}}Service`
+
+TODO: Add API documentation

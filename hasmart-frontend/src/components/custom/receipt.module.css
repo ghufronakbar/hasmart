@@ -1,0 +1,152 @@
+/* src/components/custom/receipt.module.css */
+
+.receiptContainer {
+  width: 58mm;
+  padding: 4mm 0;
+  background-color: white;
+  color: black;
+  font-family: "Arial", sans-serif; /* Font tegas agar mudah dibaca */
+  font-size: 10px;
+  line-height: 1.3;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+/* HEADER */
+.header {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.logo {
+  max-width: 25mm;
+  max-height: 10mm;
+  margin-bottom: 2px;
+  display: inline-block;
+}
+
+.storeName {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 2px 0;
+}
+
+.address {
+  font-size: 9px;
+  margin: 0;
+}
+
+/* METADATA (Tgl, No, Plg, Ksr) */
+.metadata {
+  margin-bottom: 5px;
+  margin-top: 10px;
+}
+
+.metaRow {
+  display: flex;
+}
+
+/* Lebar label disesuaikan agar titik dua sejajar */
+.metaLabel {
+  width: 35px;
+  /* Opsional: uncomment bawah ini jika ingin label rata kanan dekat titik dua */
+  /* text-align: right; */
+  /* padding-right: 5px; */
+}
+
+.metaValue {
+  flex: 1;
+  padding-left: 2px; /* Jarak sedikit dari titik dua (jika titik dua ikut label) */
+}
+
+/* TABLE HEADER */
+.tableHeader {
+  border-top: 1px solid black;
+  border-bottom: 1px solid black;
+  margin: 5px 0;
+  padding: 2px 0;
+  display: flex;
+  font-weight: 500;
+}
+
+.colQty {
+  width: 25%;
+  text-align: left;
+}
+.colPrice {
+  width: 25%;
+  text-align: right;
+}
+.colDisc {
+  width: 20%;
+  text-align: right;
+}
+.colTotal {
+  width: 30%;
+  text-align: right;
+}
+
+/* ITEMS */
+.itemRow {
+  margin-bottom: 4px;
+}
+
+.itemName {
+  font-weight: 500;
+  margin-bottom: 1px;
+}
+
+.itemDetails {
+  display: flex;
+}
+
+/* FOOTER / TOTALS */
+.totals {
+  margin-top: 5px;
+  border-top: 1px solid black;
+  padding-top: 2px;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.finalTotal {
+  border-top: 1px solid black;
+  margin-top: 2px;
+  padding-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.footerMessage {
+  text-align: center;
+  margin-top: 15px;
+  font-size: 10px;
+}
+
+/* MEDIA QUERY PRINT */
+@media print {
+  @page {
+    size: 58mm auto;
+    margin: 0;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .receiptContainer,
+  .receiptContainer * {
+    visibility: visible;
+  }
+
+  .receiptContainer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

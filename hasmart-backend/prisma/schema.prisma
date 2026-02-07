@@ -1,0 +1,1121 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Branch {
+  id Int @id @default(autoincrement()) @map("id")
+
+  // branch setting
+  code      String  @unique @map("code")
+  name      String  @map("name")
+  address   String? @map("address") @db.Text()
+  phone     String? @map("phone") @db.Text()
+  email     String? @map("email")
+  fax       String? @map("fax")
+  npwp      String? @map("npwp")
+  ownerName String? @map("owner_name")
+
+  // another settings
+  receiptSize         String? @map("receipt_size") // TODO: fix enum later
+  receiptFooter       String? @map("receipt_footer")
+  receiptPrinter      String? @map("receipt_printer")
+  labelBarcodePrinter String? @map("label_barcode_printer")
+  reportPrinter       String? @map("report_printer")
+
+  // relation
+  itemBranches               ItemBranch[]
+  transactionPurchases       TransactionPurchase[]
+  transactionPurchaseReturns TransactionPurchaseReturn[]
+  transactionSales           TransactionSales[]
+  transactionSalesReturns    TransactionSalesReturn[]
+  transactionSells           TransactionSell[]
+  transactionSellReturns     TransactionSellReturn[]
+  transactionTransfersFroms  TransactionTransfer[]       @relation("FromTransfer")
+  transactionTransferTos     TransactionTransfer[]       @relation("ToTransfer")
+  transactionAdjustments     TransactionAdjustment[]
+  frontStockTransfers        FrontStockTransfer[]
+  transactionCashFlows       TransactionCashFlow[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("branches")
+}
+
+model User {
+  id   Int    @id @default(autoincrement()) @map("id")
+  name String @unique @map("name")
+
+  password String  @map("password")
+  isActive Boolean @map("is_active")
+
+  isSuperUser Boolean @map("is_super_user") // user pertama yang dibuat ketika aplikasi dijalankan
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // user take action
+  recordActions         RecordAction[]
+  itemBuyPriceOverrides ItemBuyPriceOverride[]
+  frontStockTransfers   FrontStockTransfer[]
+
+  refreshToken String? @unique @map("refresh_token") @db.Text()
+
+  // access general
+  accessOverviewRead          Boolean @default(false) @map("access_overview_read")
+  accessReportRead            Boolean @default(false) @map("access_report_read")
+  accessPointOfSalesRead      Boolean @default(false) @map("access_point_of_sales_read")
+  accessPointOfSalesWrite     Boolean @default(false) @map("access_point_of_sales_write")
+  accessPrintLabelRead        Boolean @default(false) @map("access_print_label_read")
+  accessFrontStockRead        Boolean @default(false) @map("access_front_stock_read")
+  accessFrontStockWrite       Boolean @default(false) @map("access_front_stock_write")
+  accessFrontStockHistoryRead Boolean @default(false) @map("access_front_stock_history_read")
+
+  // access app
+  accessAppUserRead    Boolean @default(false) @map("access_app_user_read")
+  accessAppUserWrite   Boolean @default(false) @map("access_app_user_write")
+  accessAppBranchWrite Boolean @default(false) @map("access_app_branch_write")
+
+  // access master item
+  accessMasterItemRead            Boolean @default(false) @map("access_master_item_read")
+  accessMasterItemWrite           Boolean @default(false) @map("access_master_item_write")
+  accessMasterItemCategoryRead    Boolean @default(false) @map("access_master_item_category_read")
+  accessMasterItemCategoryWrite   Boolean @default(false) @map("access_master_item_category_write")
+  accessMasterMemberRead          Boolean @default(false) @map("access_master_member_read")
+  accessMasterMemberWrite         Boolean @default(false) @map("access_master_member_write")
+  accessMasterMemberCategoryRead  Boolean @default(false) @map("access_master_member_category_read")
+  accessMasterMemberCategoryWrite Boolean @default(false) @map("access_master_member_category_write")
+  accessMasterSupplierRead        Boolean @default(false) @map("access_master_supplier_read")
+  accessMasterSupplierWrite       Boolean @default(false) @map("access_master_supplier_write")
+  accessMasterUnitRead            Boolean @default(false) @map("access_master_unit_read")
+  accessMasterUnitWrite           Boolean @default(false) @map("access_master_unit_write")
+
+  // transaction
+  accessTransactionPurchaseRead        Boolean @default(false) @map("access_transaction_purchase_read")
+  accessTransactionPurchaseWrite       Boolean @default(false) @map("access_transaction_purchase_write")
+  accessTransactionPurchaseReturnRead  Boolean @default(false) @map("access_transaction_purchase_return_read")
+  accessTransactionPurchaseReturnWrite Boolean @default(false) @map("access_transaction_purchase_return_write")
+  accessTransactionSalesRead           Boolean @default(false) @map("access_transaction_sales_read")
+  accessTransactionSalesWrite          Boolean @default(false) @map("access_transaction_sales_write")
+  accessTransactionSalesReturnRead     Boolean @default(false) @map("access_transaction_sales_return_read")
+  accessTransactionSalesReturnWrite    Boolean @default(false) @map("access_transaction_sales_return_write")
+  accessTransactionSellRead            Boolean @default(false) @map("access_transaction_sell_read")
+  accessTransactionSellWrite           Boolean @default(false) @map("access_transaction_sell_write")
+  accessTransactionSellReturnRead      Boolean @default(false) @map("access_transaction_sell_return_read")
+  accessTransactionSellReturnWrite     Boolean @default(false) @map("access_transaction_sell_return_write")
+  accessTransactionTransferRead        Boolean @default(false) @map("access_transaction_transfer_read")
+  accessTransactionTransferWrite       Boolean @default(false) @map("access_transaction_transfer_write")
+  accessTransactionAdjustmentRead      Boolean @default(false) @map("access_transaction_adjustment_read")
+  accessTransactionAdjustmentWrite     Boolean @default(false) @map("access_transaction_adjustment_write")
+  accessTransactionCashFlowRead        Boolean @default(false) @map("access_transaction_cash_flow_read")
+  accessTransactionCashFlowWrite       Boolean @default(false) @map("access_transaction_cash_flow_write")
+
+  @@map("users")
+}
+
+// ex: RKK - Rokok
+// Bersifat global, bukan per cabang
+model MasterItemCategory {
+  id Int @id @default(autoincrement()) @map("id")
+
+  code String @map("code") // ex: DET
+  name String @map("name") // ex: Detergen
+
+  // relation
+  items MasterItem[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("categories")
+}
+
+// Bersifat global, bukan per cabang
+model MasterItem {
+  id Int @id @default(autoincrement()) @map("id")
+
+  name String @map("name")
+  code String @unique @map("code") // code bisa dari barcode atau input manual pada realcase harus unique
+
+  masterItemCategoryId Int                @map("master_item_category_id")
+  masterItemCategory   MasterItemCategory @relation(fields: [masterItemCategoryId], references: [id])
+
+  masterSupplierId Int            @map("master_supplier_id") // hanya sebagai referensi siapa supplier utama
+  masterSupplier   MasterSupplier @relation(fields: [masterSupplierId], references: [id])
+
+  // global (inputable)
+  isActive Boolean @map("is_active")
+
+  // global (recorded from transaction) //average
+  recordedBuyPrice Decimal @map("recorded_buy_price") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+
+  // mapping item per cabang (ex: kebutuhan stok)
+  itemBranches ItemBranch[]
+
+  // variant (ex: PCS, PACK, dll)
+  masterItemVariants MasterItemVariant[]
+
+  // track purchase & returns
+  transactionPurchaseItems       TransactionPurchaseItem[]
+  transactionPurchaseReturnItems TransactionPurchaseReturnItem[]
+
+  // track sales & returns
+  transactionSalesItems       TransactionSalesItem[]
+  transactionSalesReturnItems TransactionSalesReturnItem[]
+
+  // track sell & returns
+  transactionSellItems       TransactionSellItem[]
+  transactionSellReturnItems TransactionSellReturnItem[]
+
+  // track transfer
+  transactionTransferItems TransactionTransferItem[]
+
+  // track adjustment
+  transactionAdjustments TransactionAdjustment[]
+
+  // override stock
+  itemBuyPriceOverrides ItemBuyPriceOverride[]
+
+  // track front stock transfer
+  frontStockTransferItems FrontStockTransferItem[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("master_items")
+}
+
+// sebagai pivot dan beberapa informasi tambahan
+model ItemBranch {
+  id Int @id @default(autoincrement()) @map("id")
+
+  // recorded (from transaction)
+  recordedStock      Int @map("recorded_stock")
+  recordedFrontStock Int @map("recorded_front_stock")
+  // tidak berpengaruh dengan recordedStock (stock belakang), hanya sebagai display di kasir
+  // affected by transaction sales & transaction sales return (sell tidak karena, stock belakang)
+
+  // pivot
+  masterItemId Int        @map("master_item_id")
+  masterItem   MasterItem @relation(fields: [masterItemId], references: [id])
+  branchId     Int        @map("branch_id")
+  branch       Branch     @relation(fields: [branchId], references: [id])
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([masterItemId, branchId])
+  @@map("item_branches")
+}
+
+model FrontStockTransfer {
+  id Int @id @default(autoincrement()) @map("id")
+
+  notes                   String                   @default("") @map("notes")
+  frontStockTransferItems FrontStockTransferItem[]
+
+  // branch
+  branchId Int    @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  // actioner
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("front_stock_transfers")
+}
+
+model FrontStockTransferItem {
+  id Int @id @default(autoincrement()) @map("id")
+
+  amount             Int @map("amount") // dalam satuan variant
+  totalAmount        Int @map("total_amount") // dalam satuan 1
+  recordedConversion Int @map("recorded_conversion") // semisal 12
+  // ex: amount 1, totalAmount 12, recordedConversion 12 -> 1 Pack
+
+  frontStockTransferId Int                @map("front_stock_transfer_id")
+  frontStockTransfer   FrontStockTransfer @relation(fields: [frontStockTransferId], references: [id])
+
+  masterItemId Int        @map("master_item_id")
+  masterItem   MasterItem @relation(fields: [masterItemId], references: [id])
+
+  masterVariantId Int               @map("master_variant_id")
+  masterVariant   MasterItemVariant @relation(fields: [masterVariantId], references: [id])
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("front_stock_transfer_items")
+}
+
+model MasterItemVariant {
+  id Int @id @default(autoincrement()) @map("id")
+
+  unit   String @map("unit") // PCS, PACK, BOX
+  amount Int    @map("amount") // Konversi ke base unit. Base = 1
+
+  recordedBuyPrice Decimal @map("recorded_buy_price") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // harga beli yang di record dari transaksi
+  sellPrice        Decimal @map("sell_price") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // karena harga per pcs dan pack beda
+
+  masterItemId Int        @map("master_item_id")
+  masterItem   MasterItem @relation(fields: [masterItemId], references: [id])
+
+  isBaseUnit Boolean @map("is_base_unit") // apakah ini unit dasar (biasanya PCS, intinya amount=1)
+
+  // recorded (from transaction)
+  recordedProfitPercentage Decimal @map("recorded_profit_percentage") @db.Decimal(5, 2) // CHANGED_INT_TO_DECIMAL
+  recordedProfitAmount     Decimal @map("recorded_profit_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+
+  // track purchase & returns
+  transactionPurchaseItems       TransactionPurchaseItem[]
+  transactionPurchaseReturnItems TransactionPurchaseReturnItem[]
+
+  // track sales & returns
+  transactionSalesItems       TransactionSalesItem[]
+  transactionSalesReturnItems TransactionSalesReturnItem[]
+
+  // track sell & returns
+  transactionSellItems       TransactionSellItem[]
+  transactionSellReturnItems TransactionSellReturnItem[]
+
+  // track transfer
+  transactionTransferItems TransactionTransferItem[]
+
+  // track adjustment
+  transactionAdjustments TransactionAdjustment[]
+
+  // track front stock transfer
+  frontStockTransferItems FrontStockTransferItem[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("item_variants")
+}
+
+model MasterSupplier {
+  id Int @id @default(autoincrement()) @map("id")
+
+  code    String  @map("code") // ex: MYR
+  name    String  @map("name") // ex: Mayora
+  phone   String? @map("phone")
+  address String? @map("address")
+  email   String? @map("email")
+
+  masterItems                MasterItem[]
+  transactionPurchases       TransactionPurchase[]
+  transactionPurchaseReturns TransactionPurchaseReturn[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("master_suppliers")
+}
+
+// untuk sebagai autocomplete di master item variant
+model MasterUnit {
+  id Int @id @default(autoincrement()) @map("id")
+
+  unit String @map("unit") // PCS, PACK, dll
+  name String @map("name") // Piece, Pack, dll
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("master_units")
+}
+
+model MasterMemberCategory {
+  id Int @id @default(autoincrement()) @map("id")
+
+  code  String @map("code") // ex: REG, VIP, dll
+  name  String @map("name") // ex: Regular, Premium, dll
+  color String @map("color") @db.Char(6) // ex: "FF0000"
+
+  masterMembers MasterMember[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("master_member_categories")
+}
+
+model MasterMember {
+  id Int @id @default(autoincrement()) @map("id")
+
+  code String @map("code") // ex: 6285123456789
+  name String @map("name") // ex: Budi Santoso
+
+  phone   String? @map("phone") // ex: 6285123456789
+  email   String? @map("email") // ex: [EMAIL_ADDRESS]
+  address String? @map("address") @db.Text() // ex: Jl. Contoh No. 123
+
+  masterMemberCategoryId Int                  @map("master_member_category_id")
+  masterMemberCategory   MasterMemberCategory @relation(fields: [masterMemberCategoryId], references: [id])
+
+  // track sales & returns
+  transactionSales        TransactionSales[]
+  transactionSalesReturns TransactionSalesReturn[]
+
+  // track sell & returns
+  transactionSells       TransactionSell[]
+  transactionSellReturns TransactionSellReturn[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("master_members")
+}
+
+// =============================== TRANSACTION ===============================
+// Main Table:
+// - TransactionPurchase (pembelian dari cabang ke pembelian (stock++))
+// - TransactionPurchaseReturn (pengembalian pembelian dari cabang ke pembelian (stock--))
+// - TransactionSales (penjualan dari cabang ke customer (stock--))
+// - TransactionSalesReturn (pengembalian penjualan dari cabang ke customer (stock++))
+// - TransactionSell (penjualan dari cabang ke customer b2b (stock--))
+// - TransactionSellReturn (pengembalian penjualan dari cabang ke customer b2b (stock++))
+// - TransactionTransfer (transfer dari cabang ke cabang lain (stock++ atau stock-- bergantung from/to))
+// - TransactionAdjustment (penyesuaian stok dari cabang, bergantung + atau - dari gap amount)
+
+// [TRANSACTION PURCHASE] 
+model TransactionPurchase {
+  id Int @id @default(autoincrement()) @map("id")
+
+  invoiceNumber   String   @map("invoice_number") // ex: TP-2026-001
+  transactionDate DateTime @map("transaction_date") // ex: 2026-01-26 inputable
+  dueDate         DateTime @map("due_date") // ex: 2026-01-26 inputable
+  notes           String   @default("") @map("notes") @db.Text()
+
+  // recorded
+  recordedSubTotalAmount Decimal @map("recorded_sub_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari amount setiap item
+  recordedDiscountAmount Decimal @map("recorded_discount_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari setiap item discount
+  recordedTaxPercentage  Decimal @map("recorded_tax_percentage") @db.Decimal(5, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari tax
+  recordedTaxAmount      Decimal @map("recorded_tax_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari tax
+  recordedTotalAmount    Decimal @map("recorded_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize hasil akhir
+
+  masterSupplierId Int            @map("master_supplier_id")
+  masterSupplier   MasterSupplier @relation(fields: [masterSupplierId], references: [id])
+
+  branchId Int    @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  // relation
+  transactionPurchaseItems   TransactionPurchaseItem[]
+  transactionPurchaseReturns TransactionPurchaseReturn[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_purchases")
+}
+
+// setiap item pembelian merepresentasikan 1 barang dengan amount tergantung variant
+model TransactionPurchaseItem {
+  id Int @id @default(autoincrement()) @map("id")
+
+  transactionPurchaseId Int                 @map("transaction_purchase_id")
+  transactionPurchase   TransactionPurchase @relation(fields: [transactionPurchaseId], references: [id])
+
+  masterItemId Int        @map("master_item_id")
+  masterItem   MasterItem @relation(fields: [masterItemId], references: [id])
+
+  masterItemVariantId Int               @map("master_item_variant_id")
+  masterItemVariant   MasterItemVariant @relation(fields: [masterItemVariantId], references: [id])
+
+  qty                Int @map("qty") // Beli berapa Pack?
+  recordedConversion Int @map("recorded_conversion") // 1 Pack isi berapa saat beli ini? (disimpan statis jaga2 kalau master berubah)
+  totalQty           Int @map("total_qty") // total qty (qty * recordedConversion)
+
+  recordedSubTotalAmount Decimal @map("recorded_sub_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari variantAmount * amount
+  recordedDiscountAmount Decimal @map("recorded_discount_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari setiap item discount
+  recordedTotalAmount    Decimal @map("recorded_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari amount setiap item
+  recordedAfterTaxAmount Decimal @map("recorded_after_tax_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari amount setiap item
+
+  purchasePrice Decimal @map("purchase_price") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // harga beli per 1 barang variant
+
+  // relation
+  // setiap item ada diskon masing masing
+  transactionPurchaseDiscounts TransactionPurchaseDiscount[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_purchase_items")
+}
+
+model TransactionPurchaseDiscount {
+  id Int @id @default(autoincrement()) @map("id")
+
+  orderIndex Int @map("order_index") // karena compound, maka ada urutan diskon mana yang dahulu di exec, untuk tiap item harus unique dan urut, ex: [1, 2, 3]
+
+  transactionPurchaseItemId Int                     @map("transaction_purchase_item_id")
+  transactionPurchaseItem   TransactionPurchaseItem @relation(fields: [transactionPurchaseItemId], references: [id])
+
+  percentage     Decimal @map("percentage") @db.Decimal(5, 2) // CHANGED_INT_TO_DECIMAL
+  recordedAmount Decimal @map("recorded_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_purchase_discounts")
+}
+
+// [TRANSACTION PURCHASE RETURN]
+// input sama seperti TransactionPurchase, tidak ada relasi apapun dengan TransactionPurchase
+model TransactionPurchaseReturn {
+  id Int @id @default(autoincrement()) @map("id")
+
+  transactionPurchaseId Int                 @map("transaction_purchase_id")
+  transactionPurchase   TransactionPurchase @relation(fields: [transactionPurchaseId], references: [id])
+
+  invoiceNumber   String   @map("invoice_number") // ex: TP-2026-001 (ref number)
+  transactionDate DateTime @map("transaction_date") // ex: 2026-01-26 inputable
+  dueDate         DateTime @map("due_date") // ex: 2026-01-26 inputable
+  notes           String   @default("") @map("notes") @db.Text()
+
+  // recorded
+  recordedSubTotalAmount Decimal @map("recorded_sub_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari amount setiap item
+  recordedDiscountAmount Decimal @map("recorded_discount_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari setiap item discount
+  recordedTaxAmount      Decimal @map("recorded_tax_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari tax
+  recordedTaxPercentage  Decimal @map("recorded_tax_percentage") @db.Decimal(5, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari tax
+  recordedTotalAmount    Decimal @map("recorded_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize hasil akhir (anggapnya ini hasil akhir uang yang masuk kembali ke perusahaan)
+
+  masterSupplierId Int            @map("master_supplier_id")
+  masterSupplier   MasterSupplier @relation(fields: [masterSupplierId], references: [id])
+
+  branchId Int    @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  // relation
+  transactionPurchaseReturnItems TransactionPurchaseReturnItem[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_purchase_returns")
+}
+
+// setiap item retur pembelian merepresentasikan 1 barang dengan amount tergantung variant
+model TransactionPurchaseReturnItem {
+  id Int @id @default(autoincrement()) @map("id")
+
+  transactionPurchaseReturnId Int                       @map("transaction_purchase_return_id")
+  transactionPurchaseReturn   TransactionPurchaseReturn @relation(fields: [transactionPurchaseReturnId], references: [id])
+
+  masterItemId Int        @map("master_item_id")
+  masterItem   MasterItem @relation(fields: [masterItemId], references: [id])
+
+  masterItemVariantId Int               @map("master_item_variant_id")
+  masterItemVariant   MasterItemVariant @relation(fields: [masterItemVariantId], references: [id])
+
+  qty                Int @map("qty") // Beli berapa Pack?
+  recordedConversion Int @map("recorded_conversion") // 1 Pack isi berapa saat beli ini? (disimpan statis jaga2 kalau master berubah)
+  totalQty           Int @map("total_qty") // total qty (qty * recordedConversion)
+
+  recordedSubTotalAmount Decimal @map("recorded_sub_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari variantAmount * amount
+  recordedDiscountAmount Decimal @map("recorded_discount_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari setiap item discount
+  recordedTotalAmount    Decimal @map("recorded_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari amount setiap item
+
+  purchasePrice Decimal @map("purchase_price") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // harga beli per 1 barang variant
+
+  // relation
+  // setiap item ada diskon masing masing
+  transactionPurchaseReturnDiscounts TransactionPurchaseReturnDiscount[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_purchase_return_items")
+}
+
+model TransactionPurchaseReturnDiscount {
+  id Int @id @default(autoincrement()) @map("id")
+
+  orderIndex Int @map("order_index") // karena compound, maka ada urutan diskon mana yang dahulu di exec, untuk tiap item harus unique dan urut, ex: [1, 2, 3]
+
+  transactionPurchaseReturnItemId Int                           @map("transaction_purchase_return_item_id")
+  transactionPurchaseReturnItem   TransactionPurchaseReturnItem @relation(fields: [transactionPurchaseReturnItemId], references: [id])
+
+  percentage     Decimal @map("percentage") @db.Decimal(5, 2) // CHANGED_INT_TO_DECIMAL
+  recordedAmount Decimal @map("recorded_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_purchase_return_discounts")
+}
+
+// [TRANSACTION SALES]
+// secara real case digunakan untuk kasir
+
+model TransactionSales {
+  id Int @id @default(autoincrement()) @map("id")
+
+  invoiceNumber String @unique @map("invoice_number") // ex: TS-2026-001 (ref number, generated)
+  notes         String @default("") @map("notes") @db.Text()
+
+  // cash
+  cashReceived Decimal @map("cash_received") @db.Decimal(18, 2)
+  cashChange   Decimal @map("cash_change") @db.Decimal(18, 2)
+
+  // recorded
+  recordedSubTotalAmount Decimal @map("recorded_sub_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari amount setiap item
+  recordedDiscountAmount Decimal @map("recorded_discount_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari setiap item discount
+  recordedTotalAmount    Decimal @map("recorded_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize hasil akhir
+
+  masterMemberId Int?          @map("master_member_id")
+  masterMember   MasterMember? @relation(fields: [masterMemberId], references: [id])
+
+  branchId Int    @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  // time
+  transactionDate DateTime @map("transaction_date")
+
+  // relation
+  transactionSalesItems TransactionSalesItem[]
+
+  // new enum type
+  paymentType SalesPaymentType @map("payment_type")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  transactionSalesReturns TransactionSalesReturn[] // semisal jika ada retur, bisa banyak, karena bisa retur pesanan partial
+
+  @@map("transaction_sales")
+}
+
+enum SalesPaymentType {
+  CASH
+  DEBIT
+  QRIS
+}
+
+model TransactionSalesItem {
+  id Int @id @default(autoincrement()) @map("id")
+
+  transactionSalesId Int              @map("transaction_sales_id")
+  transactionSales   TransactionSales @relation(fields: [transactionSalesId], references: [id])
+
+  masterItemId Int        @map("master_item_id")
+  masterItem   MasterItem @relation(fields: [masterItemId], references: [id])
+
+  masterItemVariantId Int               @map("master_item_variant_id")
+  masterItemVariant   MasterItemVariant @relation(fields: [masterItemVariantId], references: [id])
+
+  qty                Int @map("qty") // Beli berapa Pack?
+  recordedConversion Int @map("recorded_conversion") // 1 Pack isi berapa saat beli ini? (disimpan statis jaga2 kalau master berubah)
+  totalQty           Int @map("total_qty") // total qty (qty * recordedConversion)
+
+  // recorded for buyprice
+  recordedBuyPrice Decimal @map("recorded_buy_price") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // harga beli per 1 barang variant
+
+  recordedSubTotalAmount Decimal @map("recorded_sub_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari variantAmount * amount
+  recordedDiscountAmount Decimal @map("recorded_discount_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari setiap item discount
+  recordedTotalAmount    Decimal @map("recorded_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari amount setiap item
+
+  salesPrice Decimal @map("sales_price") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // harga jual per 1 barang variant
+
+  transactionSalesDiscounts TransactionSalesDiscount[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_sales_items")
+}
+
+model TransactionSalesDiscount {
+  id Int @id @default(autoincrement()) @map("id")
+
+  orderIndex Int @map("order_index") // karena compound, maka ada urutan diskon mana yang dahulu di exec, untuk tiap item harus unique dan urut, ex: [1, 2, 3]
+
+  transactionSalesItemId Int                  @map("transaction_sales_item_id")
+  transactionSalesItem   TransactionSalesItem @relation(fields: [transactionSalesItemId], references: [id])
+
+  percentage     Decimal @map("percentage") @db.Decimal(5, 2) // CHANGED_INT_TO_DECIMAL
+  recordedAmount Decimal @map("recorded_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_sales_discounts")
+}
+
+// [TRANSACTION SALES RETURN]
+// secara real case digunakan untuk kasir jika ada customer minta retur
+// di realcase, retur akan mengecek TransactionSales.invoiceNumber terlebih dahulu
+// namun untuk item yang akan di return tetap input saja, karena juga partial dan sesuai usecase bisnis yang ada
+
+model TransactionSalesReturn {
+  id Int @id @default(autoincrement()) @map("id")
+
+  returnNumber String @unique // generated untuk referensi nomor
+
+  transactionSalesId Int // untuk cek validitas nanti based on invoiceNumber (ini untuk referensi retur nya di invoice apa)
+  transactionSales   TransactionSales @relation(fields: [transactionSalesId], references: [id])
+  notes              String           @default("") @map("notes") @db.Text()
+
+  // recorded
+  recordedSubTotalAmount Decimal @map("recorded_sub_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari amount setiap item
+  recordedDiscountAmount Decimal @map("recorded_discount_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari setiap item discount
+  recordedTotalAmount    Decimal @map("recorded_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize hasil akhir
+
+  masterMemberId Int?          @map("master_member_id")
+  masterMember   MasterMember? @relation(fields: [masterMemberId], references: [id])
+
+  branchId Int    @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  // time
+  transactionDate DateTime @map("transaction_date")
+
+  // relation
+  transactionSalesReturnItems TransactionSalesReturnItem[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_sales_returns")
+}
+
+model TransactionSalesReturnItem {
+  id Int @id @default(autoincrement()) @map("id")
+
+  transactionSalesReturnId Int                    @map("transaction_sales_return_id")
+  transactionSalesReturn   TransactionSalesReturn @relation(fields: [transactionSalesReturnId], references: [id])
+
+  masterItemId Int        @map("master_item_id")
+  masterItem   MasterItem @relation(fields: [masterItemId], references: [id])
+
+  masterItemVariantId Int               @map("master_item_variant_id")
+  masterItemVariant   MasterItemVariant @relation(fields: [masterItemVariantId], references: [id])
+
+  qty                Int @map("qty") // Beli berapa Pack?
+  recordedConversion Int @map("recorded_conversion") // 1 Pack isi berapa saat beli ini? (disimpan statis jaga2 kalau master berubah)
+  totalQty           Int @map("total_qty") // total qty (qty * recordedConversion)
+
+  recordedSubTotalAmount Decimal @map("recorded_sub_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari variantAmount * amount
+  recordedDiscountAmount Decimal @map("recorded_discount_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari setiap item discount
+  recordedTotalAmount    Decimal @map("recorded_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari amount setiap item
+
+  salesPrice Decimal @map("sales_price") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // harga jual per 1 barang variant
+
+  transactionSalesReturnDiscounts TransactionSalesReturnDiscount[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_sales_return_items")
+}
+
+model TransactionSalesReturnDiscount {
+  id Int @id @default(autoincrement()) @map("id")
+
+  orderIndex Int @map("order_index") // karena compound, maka ada urutan diskon mana yang dahulu di exec, untuk tiap item harus unique dan urut, ex: [1, 2, 3]
+
+  transactionSalesReturnItemId Int                        @map("transaction_sales_return_item_id")
+  transactionSalesReturnItem   TransactionSalesReturnItem @relation(fields: [transactionSalesReturnItemId], references: [id])
+
+  percentage     Decimal @map("percentage") @db.Decimal(5, 2) // CHANGED_INT_TO_DECIMAL
+  recordedAmount Decimal @map("recorded_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_sales_return_discounts")
+}
+
+// [TRANSACTION SELL]
+// Penjualan B2B (Grosir/Canvas/Kirim ke Toko Lain)
+// Bedanya dengan Sales (POS): Ada Due Date, Invoice Formal
+
+model TransactionSell {
+  id Int @id @default(autoincrement()) @map("id")
+
+  invoiceNumber   String   @map("invoice_number") // ex: INV-2026-001 Generated (Karena kita yang kirim, sistem tentukan)
+  transactionDate DateTime @map("transaction_date") // Tanggal Transaksi (Inputable)
+  dueDate         DateTime @map("due_date") // Tanggal Jatuh Tempo (Inputable)
+  notes           String   @default("") @map("notes") @db.Text()
+
+  // recorded
+  recordedSubTotalAmount Decimal @map("recorded_sub_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+  recordedDiscountAmount Decimal @map("recorded_discount_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+  recordedTaxAmount      Decimal @map("recorded_tax_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // Biasanya B2B ada pajak terpisah
+  recordedTaxPercentage  Decimal @map("recorded_tax_percentage") @db.Decimal(5, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari tax
+  recordedTotalAmount    Decimal @map("recorded_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+
+  masterMemberId Int          @map("master_member_id") // Customer B2B wajib terdaftar
+  masterMember   MasterMember @relation(fields: [masterMemberId], references: [id])
+
+  branchId Int    @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  // relation
+  transactionSellItems   TransactionSellItem[]
+  transactionSellReturns TransactionSellReturn[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_sells")
+}
+
+model TransactionSellItem {
+  id Int @id @default(autoincrement()) @map("id")
+
+  transactionSellId Int             @map("transaction_sell_id")
+  transactionSell   TransactionSell @relation(fields: [transactionSellId], references: [id])
+
+  masterItemId Int        @map("master_item_id")
+  masterItem   MasterItem @relation(fields: [masterItemId], references: [id])
+
+  masterItemVariantId Int               @map("master_item_variant_id")
+  masterItemVariant   MasterItemVariant @relation(fields: [masterItemVariantId], references: [id])
+
+  qty                Int @map("qty")
+  recordedConversion Int @map("recorded_conversion")
+  totalQty           Int @map("total_qty") // qty * recordedConversion
+
+  // recorded for buyprice
+  recordedBuyPrice Decimal @map("recorded_buy_price") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL // harga beli per 1 barang variant
+
+  recordedSubTotalAmount Decimal @map("recorded_sub_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+  recordedDiscountAmount Decimal @map("recorded_discount_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+  recordedTotalAmount    Decimal @map("recorded_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+
+  sellPrice Decimal @map("sell_price") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+
+  transactionSellDiscounts TransactionSellDiscount[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_sell_items")
+}
+
+model TransactionSellDiscount {
+  id Int @id @default(autoincrement()) @map("id")
+
+  orderIndex Int @map("order_index")
+
+  transactionSellItemId Int                 @map("transaction_sell_item_id")
+  transactionSellItem   TransactionSellItem @relation(fields: [transactionSellItemId], references: [id])
+
+  percentage     Decimal @map("percentage") @db.Decimal(5, 2) // CHANGED_INT_TO_DECIMAL
+  recordedAmount Decimal @map("recorded_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_sell_discounts")
+}
+
+// [TRANSACTION SELL RETURN]
+// Retur Penjualan B2B. 
+// Tidak ada relasi langsung ke TransactionSell (Standalone), mirip TransactionPurchaseReturn.
+
+model TransactionSellReturn {
+  id Int @id @default(autoincrement()) @map("id")
+
+  transactionSellId Int // untuk cek validitas nanti based on invoiceNumber (ini untuk referensi retur nya di invoice apa)
+  transactionSell   TransactionSell @relation(fields: [transactionSellId], references: [id])
+
+  invoiceNumber   String   @map("invoice_number") // Nomor Retur / Ref
+  transactionDate DateTime @map("transaction_date")
+  dueDate         DateTime @map("due_date") // Jika retur potong piutang/ada termin
+  notes           String   @default("") @map("notes") @db.Text()
+
+  // recorded
+  recordedSubTotalAmount Decimal @map("recorded_sub_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+  recordedDiscountAmount Decimal @map("recorded_discount_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+  recordedTaxAmount      Decimal @map("recorded_tax_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+  recordedTaxPercentage  Decimal @map("recorded_tax_percentage") @db.Decimal(5, 2) // CHANGED_INT_TO_DECIMAL // denormalize dari tax
+
+  recordedTotalAmount Decimal @map("recorded_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+
+  masterMemberId Int          @map("master_member_id")
+  masterMember   MasterMember @relation(fields: [masterMemberId], references: [id])
+
+  branchId Int    @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  // relation
+  transactionSellReturnItems TransactionSellReturnItem[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_sell_returns")
+}
+
+model TransactionSellReturnItem {
+  id Int @id @default(autoincrement()) @map("id")
+
+  transactionSellReturnId Int                   @map("transaction_sell_return_id")
+  transactionSellReturn   TransactionSellReturn @relation(fields: [transactionSellReturnId], references: [id])
+
+  masterItemId Int        @map("master_item_id")
+  masterItem   MasterItem @relation(fields: [masterItemId], references: [id])
+
+  masterItemVariantId Int               @map("master_item_variant_id")
+  masterItemVariant   MasterItemVariant @relation(fields: [masterItemVariantId], references: [id])
+
+  qty                Int @map("qty")
+  recordedConversion Int @map("recorded_conversion")
+  totalQty           Int @map("total_qty")
+
+  recordedSubTotalAmount Decimal @map("recorded_sub_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+  recordedDiscountAmount Decimal @map("recorded_discount_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+  recordedTotalAmount    Decimal @map("recorded_total_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+
+  sellPrice Decimal @map("sell_price") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+
+  transactionSellReturnDiscounts TransactionSellReturnDiscount[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_sell_return_items")
+}
+
+model TransactionSellReturnDiscount {
+  id Int @id @default(autoincrement()) @map("id")
+
+  orderIndex Int @map("order_index")
+
+  transactionSellReturnItemId Int                       @map("transaction_sell_return_item_id")
+  transactionSellReturnItem   TransactionSellReturnItem @relation(fields: [transactionSellReturnItemId], references: [id])
+
+  percentage     Decimal @map("percentage") @db.Decimal(5, 2) // CHANGED_INT_TO_DECIMAL
+  recordedAmount Decimal @map("recorded_amount") @db.Decimal(18, 2) // CHANGED_INT_TO_DECIMAL
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_sell_return_discounts")
+}
+
+// [TRANSACTION TRANSFER]
+// untuk stock dihitung tergantung branch ada di from atau to
+// [TRANSACTION TRANSFER]
+// Perpindahan stok antar cabang. 
+// Menggunakan struktur Header-Detail agar 1 pengiriman bisa memuat banyak items.
+
+model TransactionTransfer {
+  id Int @id @default(autoincrement()) @map("id")
+
+  // Header Info
+  transactionDate DateTime @map("transaction_date") // Tanggal pengiriman
+  notes           String   @default("") @map("notes") @db.Text() // Ex: "Dikirim via Supir Budi"
+
+  // Location
+  fromId Int    @map("from_id")
+  from   Branch @relation("FromTransfer", fields: [fromId], references: [id])
+
+  toId Int    @map("to_id")
+  to   Branch @relation("ToTransfer", fields: [toId], references: [id])
+
+  // Relation
+  transactionTransferItems TransactionTransferItem[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_transfers")
+}
+
+model TransactionTransferItem {
+  id Int @id @default(autoincrement()) @map("id")
+
+  transactionTransferId Int                 @map("transaction_transfer_id")
+  transactionTransfer   TransactionTransfer @relation(fields: [transactionTransferId], references: [id])
+
+  masterItemId Int        @map("master_item_id")
+  masterItem   MasterItem @relation(fields: [masterItemId], references: [id])
+
+  masterItemVariantId Int               @map("master_item_variant_id")
+  masterItemVariant   MasterItemVariant @relation(fields: [masterItemVariantId], references: [id])
+
+  qty                Int @map("qty") // Transfer berapa Pack?
+  recordedConversion Int @map("recorded_conversion") // Snapshot konversi saat transfer
+  totalQty           Int @map("total_qty") // qty * recordedConversion
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_transfer_items")
+}
+
+// [TRANSACTION ADJUSTMENT]
+// untuk penyesuaian stok semisal ada human error, bergantung pada total gap amount (entah itu positif atau negatif)
+model TransactionAdjustment {
+  id Int @id @default(autoincrement()) @map("id")
+
+  notes String @default("") @map("notes") @db.Text()
+
+  masterItemId Int        @map("master_item_id")
+  masterItem   MasterItem @relation(fields: [masterItemId], references: [id])
+
+  masterItemVariantId Int               @map("master_item_variant_id")
+  masterItemVariant   MasterItemVariant @relation(fields: [masterItemVariantId], references: [id])
+
+  recordedGapConversion Int @map("recorded_gap_conversion") // merecord conversion dari variant
+
+  inputAmount       Int @map("input_amount") // dalam pack atau sesuai variant
+  totalGapAmount    Int @map("total_gap_amount") // dalam satuan (1)
+  beforeAmount      Int @map("before_amount") // sebelum penyesuaian (dalam pack)
+  beforeTotalAmount Int @map("before_total_amount") // sebelum penyesuaian (dalam satuan 1)
+  finalAmount       Int @map("final_amount") // final amount setelah penyesuaian
+  finalTotalAmount  Int @map("final_total_amount") // final amount setelah penyesuaian (dalam satuan 1)
+
+  // branch
+  branchId Int    @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  // time
+  transactionDate DateTime @map("transaction_date")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_adjustments")
+}
+
+// [RECORD ACTION]
+
+enum RecordActionModelType {
+  TRANSACTION_PURCHASE
+  TRANSACTION_PURCHASE_RETURN
+  TRANSACTION_SALES
+  TRANSACTION_SALES_RETURN
+  TRANSACTION_SELL
+  TRANSACTION_SELL_RETURN
+  TRANSACTION_TRANSFER
+  TRANSACTION_ADJUSTMENT
+  TRANSACTION_CASH_FLOW
+}
+
+enum RecordActionType {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+model RecordAction {
+  id Int @id @default(autoincrement()) @map("id")
+
+  modelType RecordActionModelType @map("model_type")
+  modelId   Int                   @map("model_id")
+
+  actionType RecordActionType @map("action_type")
+
+  // payload berisi parent hingga item
+  payloadBefore Json? @map("payload_before")
+  payloadAfter  Json? @map("payload_after")
+
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("record_actions")
+}
+
+model ItemBuyPriceOverride {
+  id Int @id @default(autoincrement()) @map("id")
+
+  masterItemId Int        @map("master_item_id")
+  masterItem   MasterItem @relation(fields: [masterItemId], references: [id])
+
+  // Harga baru yang diinput user
+  newBuyPrice Decimal @map("new_buy_price") @db.Decimal(18, 2)
+
+  // Stok saat override terjadi (Snapshot). 
+  // Penting! Karena ini jadi "bobot" perhitungan awal.
+  snapshotStock Int @map("snapshot_stock")
+
+  notes  String? @map("notes") @db.Text()
+  userId Int     @map("user_id") // Siapa yang mengubah
+  user   User    @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([masterItemId, createdAt])
+  @@map("item_buy_price_overrides")
+}
+
+// KAS MASUK / KAS KELUAR
+// CASE:
+// semisal kasir ada keperluan beli gas, beli bensi
+// semisal ada uang kembalian yang tidak terpakai / donasi
+
+model TransactionCashFlow {
+  id Int @id @default(autoincrement()) @map("id")
+
+  transactionDate DateTime                @map("transaction_date")
+  notes           String                  @default("") @map("notes") @db.Text()
+  amount          Decimal                 @map("amount") @db.Decimal(18, 2) // plus
+  type            TransactionCashFlowType @map("type")
+
+  // branch
+  branchId Int    @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("transaction_cash_flows")
+}
+
+enum TransactionCashFlowType {
+  IN
+  OUT
+}

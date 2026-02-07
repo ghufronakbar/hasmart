@@ -1,0 +1,14 @@
+import { z } from "zod";
+
+export const {{pascalCase}}BodySchema = z.object({
+  name: z.string(),
+  // TODO: Add more fields
+});
+
+export type {{pascalCase}}BodyType = z.infer<typeof {{pascalCase}}BodySchema>;
+
+export const {{pascalCase}}ParamsSchema = z.object({
+  {{camelCase}}Id: z.coerce.number(),
+});
+
+export type {{pascalCase}}ParamsType = z.infer<typeof {{pascalCase}}ParamsSchema>;

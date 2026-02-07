@@ -1,0 +1,67 @@
+{
+  "name": "hasmart-backend",
+  "version": "1.0.0",
+  "description": "Learn GIT on purpose",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only --exit-child ./src/index.ts",
+    "postinstall": "prisma generate",
+    "build": "tsc --project tsconfig.json",
+    "gen:module": "node scripts/generate-module.js",
+    "seed:purchase": "ts-node ./scripts/seed-purchase.ts",
+    "seed:sales": "ts-node ./scripts/seed-sales.ts",
+    "seed:item": "ts-node ./scripts/seed-item.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "axios": "^1.13.2",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.2",
+    "express-list-endpoints": "^7.1.1",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.0",
+    "multer": "^2.0.2",
+    "pdfmake": "^0.3.3",
+    "prisma": "^5.22.0",
+    "xlsx": "^0.18.5",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.9",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.22",
+    "@types/express-list-endpoints": "^6.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/lodash": "^4.17.19",
+    "@types/morgan": "^1.9.10",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^20.17.57",
+    "@types/pdfmake": "^0.3.0",
+    "mustache": "^4.2.0",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.8.3"
+  },
+  "directories": {
+    "lib": "lib"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lanstheprodigy/learn-git.git"
+  },
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/lanstheprodigy/learn-git/issues"
+  },
+  "homepage": "https://github.com/lanstheprodigy/learn-git"
+}
