@@ -13,8 +13,7 @@ import {
     X,
     ShoppingCart,
     CreditCard,
-    User,
-    Minus
+    User
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -122,6 +121,8 @@ export default function PointOfSalesPage() {
     const [isScanning, setIsScanning] = useState(false);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     const barcodeInputRef = useRef<HTMLInputElement>(null);
+    const qtyInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+    const [scanTrigger, setScanTrigger] = useState(0);
 
     // --- Daily Receipt ---
     const dailyReceiptRef = useRef<HTMLDivElement>(null);
@@ -315,25 +316,25 @@ export default function PointOfSalesPage() {
 
         // Clear search to focus back on scanning/typing next
         setSearchItem("");
-        // Return focus to scanner
-        setTimeout(() => {
-            barcodeInputRef.current?.focus();
-        }, 20);
+        // Trigger focus to Qty
+        setScanTrigger(prev => prev + 1);
     };
-
-    // Auto-focus scanner when scanning finishes
-    useEffect(() => {
-        if (!isScanning) {
-            // Small timeout to ensure DOM 'disabled' attribute is removed
-            const timer = setTimeout(() => {
-                barcodeInputRef.current?.focus();
-            }, 50);
-            return () => clearTimeout(timer);
-        }
-    }, [isScanning]);
 
     useModEnter(() => barcodeInputRef.current?.focus());
 
+    // Auto-focus Qty input when scan finishes
+    useEffect(() => {
+        if (lastAddedIndex !== null) {
+            // Small timeout to allow ref to populate for new items
+            setTimeout(() => {
+                const input = qtyInputRefs.current[lastAddedIndex];
+                if (input) {
+                    input.focus();
+                    input.select(); // Auto-select so user can type immediately
+                }
+            }, 50);
+        }
+    }, [lastAddedIndex, scanTrigger]);
 
     // Handle Barcode Scan
     const handleScan = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -382,6 +383,7 @@ export default function PointOfSalesPage() {
                             qty: Number(existingItem.qty) + 1,
                         });
                         setLastAddedIndex(existingIndex);
+                        setScanTrigger(prev => prev + 1);
                         toast.success(`${item.name} (+1)`);
                     } else {
                         append({
@@ -397,6 +399,7 @@ export default function PointOfSalesPage() {
                             variants: item.masterItemVariants
                         });
                         setLastAddedIndex(fields.length);
+                        setScanTrigger(prev => prev + 1);
                         toast.success(`${item.name} ditambahkan`);
                     }
                 } else {
@@ -407,7 +410,6 @@ export default function PointOfSalesPage() {
                 toast.error("Kode tidak ditemukan");
             } finally {
                 setIsScanning(false);
-                // Focus handling is now done by useEffect on isScanning change
             }
         }
     };
@@ -430,25 +432,18 @@ export default function PointOfSalesPage() {
         }
     };
 
-    // Qty Controls
-    const changeQty = (index: number, delta: number) => {
-        const item = watchedItems[index];
-        const newQty = Math.max(1, Number(item.qty) + delta);
-        update(index, { ...item, qty: newQty });
-    };
-
     // Discount Helpers
     const addDiscount = (index: number) => {
         const item = form.getValues(`items.${index}`);
         const currentDiscounts = item.discounts || [];
-        update(index, { ...item, discounts: [...currentDiscounts, { percentage: 0 }] });
+        form.setValue(`items.${index}.discounts`, [...currentDiscounts, { percentage: 0 }]);
     };
 
     const removeDiscount = (index: number, discountIndex: number) => {
         const item = form.getValues(`items.${index}`);
         const currentDiscounts = item.discounts || [];
         const newDiscounts = currentDiscounts.filter((_, i) => i !== discountIndex);
-        update(index, { ...item, discounts: newDiscounts });
+        form.setValue(`items.${index}.discounts`, newDiscounts);
     };
 
     const updateDiscount = (index: number, discountIndex: number, val: string) => {
@@ -461,7 +456,7 @@ export default function PointOfSalesPage() {
         } else {
             newDiscounts[discountIndex] = { percentage: parseFloat(val) };
         }
-        update(index, { ...item, discounts: newDiscounts });
+        form.setValue(`items.${index}.discounts`, newDiscounts);
     };
 
     // Calculations
@@ -680,6 +675,31 @@ export default function PointOfSalesPage() {
                                             <div className="flex flex-row gap-1 justify-between w-full items-center">
                                                 <div className="font-semibold text leading-tight">{values.name || "Item Unknown"}</div>
                                                 <div className=" flex flex-wrap gap-2 items-center">
+
+                                                    <Input
+                                                        type="number"
+                                                        ref={(el) => { qtyInputRefs.current[index] = el; }}
+                                                        className="h-7 w-16 text-center font-mono font-bold text-sm px-1"
+                                                        value={values.qty}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            const newQty = val === "" ? 0 : parseFloat(val);
+                                                            form.setValue(`items.${index}.qty`, newQty);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === "Enter") {
+                                                                e.preventDefault();
+                                                                barcodeInputRef.current?.focus();
+                                                            }
+                                                        }}
+                                                        onBlur={(e) => {
+                                                            // Reset to 1 if empty or 0 on blur
+                                                            const val = parseFloat(e.target.value);
+                                                            if (!val || val < 1) {
+                                                                form.setValue(`items.${index}.qty`, 1);
+                                                            }
+                                                        }}
+                                                    />
                                                     {/* Variant Selector */}
                                                     {values.variants && values.variants.length > 1 ? (
                                                         <Select
@@ -751,27 +771,7 @@ export default function PointOfSalesPage() {
                                             {/* Qty & Price Controls */}
                                             <div className="flex flex-col items-end gap-1 mt-0.5">
 
-                                                <div className="flex items-center gap-0.5 bg-background border rounded-md shadow-sm">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-7 w-7 rounded-r-none"
-                                                        onClick={() => changeQty(index, -1)}
-                                                    >
-                                                        <Minus className="h-3 w-3" />
-                                                    </Button>
-                                                    <div className="w-10 text-center font-mono font-bold text-sm">
-                                                        {values.qty}
-                                                    </div>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-7 w-7 rounded-l-none"
-                                                        onClick={() => changeQty(index, 1)}
-                                                    >
-                                                        <Plus className="h-3 w-3" />
-                                                    </Button>
-                                                </div>
+
                                                 <div className="font-mono font-medium text-right mt-2">
                                                     {calc?.netTotal.toLocaleString("id-ID")}
                                                 </div>
