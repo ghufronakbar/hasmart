@@ -321,7 +321,19 @@ export default function PointOfSalesPage() {
         }, 20);
     };
 
+    // Auto-focus scanner when scanning finishes
+    useEffect(() => {
+        if (!isScanning) {
+            // Small timeout to ensure DOM 'disabled' attribute is removed
+            const timer = setTimeout(() => {
+                barcodeInputRef.current?.focus();
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [isScanning]);
+
     useModEnter(() => barcodeInputRef.current?.focus());
+
 
     // Handle Barcode Scan
     const handleScan = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -395,8 +407,7 @@ export default function PointOfSalesPage() {
                 toast.error("Kode tidak ditemukan");
             } finally {
                 setIsScanning(false);
-                // Keep focus
-                barcodeInputRef.current?.focus();
+                // Focus handling is now done by useEffect on isScanning change
             }
         }
     };
