@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - hasmart-network
     expose:
@@ -35,6 +35,8 @@ services:
       JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY}
     networks:
       - hasmart-network
+    ports:
+      - "5555:5555"
     expose:
       - "3000"
       - "5555" # for prisma studio
@@ -77,3 +79,6 @@ services:
 networks:
   hasmart-network:
     driver: bridge
+
+volumes:
+  postgres_data:
