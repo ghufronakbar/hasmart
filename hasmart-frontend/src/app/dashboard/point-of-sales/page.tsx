@@ -70,6 +70,7 @@ import { CashFlowDialog } from "./components/cash-flow-dialog";
 import { receiptService } from "@/services/report/receipt.service";
 import { SalesReceipt, ReceiptData } from "@/types/report/receipt";
 import { Copy, Printer } from "lucide-react";
+import { useModEnter } from "@/hooks/function/use-mod-enter";
 
 // --- Schema (Mirrors SalesPage but streamlined) ---
 const discountSchema = z.object({
@@ -314,7 +315,13 @@ export default function PointOfSalesPage() {
 
         // Clear search to focus back on scanning/typing next
         setSearchItem("");
+        // Return focus to scanner
+        setTimeout(() => {
+            barcodeInputRef.current?.focus();
+        }, 20);
     };
+
+    useModEnter(() => barcodeInputRef.current?.focus());
 
     // Handle Barcode Scan
     const handleScan = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -577,7 +584,7 @@ export default function PointOfSalesPage() {
                             <div className="relative">
                                 <Input
                                     ref={barcodeInputRef}
-                                    placeholder="Scan Barcode / Ketik Kode Variant lalu Enter..."
+                                    placeholder="Scan Barcode (Ctrl + Enter untuk fokus)"
                                     className="h-12 text-lg font-mono border-primary/50 focus-visible:ring-primary pl-10"
                                     onKeyDown={handleScan}
                                     autoFocus
