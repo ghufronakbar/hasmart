@@ -194,29 +194,63 @@ export default function PurchasePage() {
         sort: "asc"
     });
 
+    // Cumulative item cache - stores all items ever fetched to ensure selected items stay visible
+    const [cachedItems, setCachedItems] = useState<Item[]>([]);
+
+    // Accumulate items from useItems into cache whenever new items are fetched
+    useEffect(() => {
+        const fetchedItems = items?.data;
+        if (fetchedItems && fetchedItems.length > 0) {
+            setCachedItems(prev => {
+                const map = new Map(prev.map(i => [i.id, i]));
+                fetchedItems.forEach(item => {
+                    // Only add if not exists, or update if new one has more variants
+                    const existing = map.get(item.id);
+                    if (!existing) {
+                        map.set(item.id, item);
+                    } else {
+                        const existingVariantCount = existing.masterItemVariants?.length || 0;
+                        const newVariantCount = item.masterItemVariants?.length || 0;
+                        if (newVariantCount > existingVariantCount) {
+                            map.set(item.id, item);
+                        }
+                    }
+                });
+                return Array.from(map.values());
+            });
+        }
+    }, [items?.data]);
 
 
-    // Merge list items with set details and scanned items to ensure selected items are in the options list
+
+    // Merge cached items with detail items and scanned items to ensure selected items are in the options list
     const itemOptions = useMemo(() => {
-        const listItems = items?.data || [];
-        // if (!editingId || !purchaseDetail?.data) return listItems; // scannedItems might exist even if not editing
-
         const detailItems = purchaseDetail?.data?.items?.map(pi => pi.masterItem).filter((i): i is Item => !!i) || [];
 
-        // Use Map to deduplicate by ID
+        // Use Map to deduplicate by ID, prefer items with more complete variant data
         const map = new Map();
-        listItems.forEach(i => map.set(i.id, i));
-        detailItems.forEach(i => {
-            if (i && i.id) map.set(i.id, i);
-        });
-        scannedItems.forEach(i => {
-            if (i && i.id) map.set(i.id, i);
-        });
 
-        const merged = Array.from(map.values());
-        console.log("DEBUG: merged itemOptions count", merged.length);
-        return merged;
-    }, [items?.data, purchaseDetail, editingId, scannedItems]);
+        const addOrMergeItem = (item: Item) => {
+            if (!item || !item.id) return;
+            const existing = map.get(item.id);
+            if (!existing) {
+                map.set(item.id, item);
+            } else {
+                const existingVariantCount = existing.masterItemVariants?.length || 0;
+                const newVariantCount = item.masterItemVariants?.length || 0;
+                if (newVariantCount > existingVariantCount) {
+                    map.set(item.id, item);
+                }
+            }
+        };
+
+        // Add all sources - cachedItems contains all fetched items across search queries
+        cachedItems.forEach(addOrMergeItem);
+        detailItems.forEach(addOrMergeItem);
+        scannedItems.forEach(addOrMergeItem);
+
+        return Array.from(map.values());
+    }, [cachedItems, purchaseDetail, scannedItems]);
 
     const { mutate: createPurchase, isPending: isCreating } = useCreatePurchase();
     const { mutate: updatePurchase, isPending: isUpdating } = useUpdatePurchase();
@@ -883,6 +917,7 @@ export default function PurchasePage() {
                                                                         inputValue={searchItem}
                                                                         onInputChange={setSearchItem}
                                                                         renderLabel={(item) => <div className="flex flex-col"><span className="font-semibold">{item.name}</span></div>}
+                                                                        filterString={searchItem}
                                                                     />
                                                                     <FormMessage />
                                                                 </FormItem>

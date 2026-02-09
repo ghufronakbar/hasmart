@@ -134,6 +134,7 @@ export default function SalesReturnPage() {
     const [isScanning, setIsScanning] = useState(false);
     const barcodeInputRef = useRef<HTMLInputElement>(null);
     const [scannedItems, setScannedItems] = useState<Item[]>([]);
+    const [invoiceItems, setInvoiceItems] = useState<Item[]>([]); // Store items from verified invoice
 
     // --- Combobox Search States ---
     const [searchItem, setSearchItem] = useState("");
@@ -162,28 +163,79 @@ export default function SalesReturnPage() {
         sort: "asc"
     });
 
+    // Cumulative item cache - stores all items ever fetched to ensure selected items stay visible
+    const [cachedItems, setCachedItems] = useState<Item[]>([]);
+
+    // Accumulate items from useItems into cache whenever new items are fetched
+    useEffect(() => {
+        const fetchedItems = items?.data;
+        if (fetchedItems && fetchedItems.length > 0) {
+            setCachedItems(prev => {
+                const map = new Map(prev.map(i => [i.id, i]));
+                fetchedItems.forEach(item => {
+                    const existing = map.get(item.id);
+                    if (!existing) {
+                        map.set(item.id, item);
+                    } else {
+                        const existingVariantCount = existing.masterItemVariants?.length || 0;
+                        const newVariantCount = item.masterItemVariants?.length || 0;
+                        if (newVariantCount > existingVariantCount) {
+                            map.set(item.id, item);
+                        }
+                    }
+                });
+                return Array.from(map.values());
+            });
+        }
+    }, [items?.data]);
+
     const [editingId, setEditingId] = useState<number | null>(null);
     const { data: salesReturnDetail, isLoading: isLoadingDetail } = useSalesReturn(editingId);
 
-    // Merge list items with detail items
+    const [submittedInvoiceQuery, setSubmittedInvoiceQuery] = useState(""); // New state for submission
+
+    // Pass empty string if editing or if we don't want to search
+    const { data: salesInvoiceData, error: invoiceCheckError, isLoading: isCheckingInvoice } = useSalesByInvoice(
+        !editingId ? submittedInvoiceQuery : ""
+    );
+
+    // Merge cached items with detail items, invoice items, and scanned items
     const itemOptions = useMemo(() => {
-        const listItems = items?.data || [];
-        // if (!editingId || !salesReturnDetail?.data) return listItems; // Keep consistency with other pages to always check scannedItems? Actually others have this check but merged with scannedItems.
-
-        const detailItems = (salesReturnDetail?.data?.transactionSalesReturnItems || [])?.map(pi => pi.masterItem).filter((i): i is Item => !!i) || [];
-
-        // Use Map to deduplicate by ID
         const map = new Map();
-        listItems.forEach(i => map.set(i.id, i));
-        detailItems.forEach(i => {
-            if (i && i.id) map.set(i.id, i);
-        });
-        scannedItems.forEach(i => {
-            if (i && i.id) map.set(i.id, i);
-        });
+
+        const addOrMergeItem = (item: Item) => {
+            if (!item || !item.id) return;
+            const existing = map.get(item.id);
+            if (!existing) {
+                map.set(item.id, item);
+            } else {
+                const existingVariantCount = existing.masterItemVariants?.length || 0;
+                const newVariantCount = item.masterItemVariants?.length || 0;
+                if (newVariantCount > existingVariantCount) {
+                    map.set(item.id, item);
+                }
+            }
+        };
+
+        // Add all sources - cachedItems contains all fetched items across search queries
+        cachedItems.forEach(addOrMergeItem);
+
+        // Include items from detail if editing
+        if (editingId && salesReturnDetail?.data) {
+            const detailItems = (salesReturnDetail.data.transactionSalesReturnItems || [])?.map(pi => pi.masterItem).filter((i): i is Item => !!i) || [];
+            detailItems.forEach(addOrMergeItem);
+        }
+
+        // Include items from verified invoice (using persistent state)
+        if (!editingId && invoiceItems.length > 0) {
+            invoiceItems.forEach(addOrMergeItem);
+        }
+
+        // Include scanned items
+        scannedItems.forEach(addOrMergeItem);
 
         return Array.from(map.values());
-    }, [items?.data, salesReturnDetail, editingId, scannedItems]);
+    }, [cachedItems, salesReturnDetail, editingId, invoiceItems, scannedItems]);
 
     const { mutate: createSalesReturn, isPending: isCreating } = useCreateSalesReturn();
     const { mutate: updateSalesReturn, isPending: isUpdating } = useUpdateSalesReturn();
@@ -195,12 +247,8 @@ export default function SalesReturnPage() {
     // Invoice Check Logic
     const [isInvoiceVerified, setIsInvoiceVerified] = useState(false);
     const [searchInvoiceQuery, setSearchInvoiceQuery] = useState("");
-    const [submittedInvoiceQuery, setSubmittedInvoiceQuery] = useState(""); // New state for submission
 
-    // Pass empty string if editing or if we don't want to search
-    const { data: salesInvoiceData, error: invoiceCheckError, isLoading: isCheckingInvoice } = useSalesByInvoice(
-        !editingId ? submittedInvoiceQuery : ""
-    );
+
 
     // Form Definition (Moved up to fix scope)
     const form = useForm<CreateSalesReturnFormValues>({
@@ -238,8 +286,14 @@ export default function SalesReturnPage() {
             form.setValue("branchId", invoice.branchId);
             form.setValue("notes", invoice.notes || "");
 
+            // Extract and store masterItems for itemOptions (persistent state)
+            const salesItems = invoice?.transactionSalesItems || [];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const extractedMasterItems = salesItems.map((item: any) => item.masterItem).filter((i: Item) => !!i);
+            setInvoiceItems(extractedMasterItems);
+
             // Map items
-            const newItems = invoice?.transactionSalesItems?.map(item => ({
+            const newItems = salesItems.map(item => ({
                 masterItemId: item.masterItemId,
                 masterItemVariantId: item.masterItemVariantId,
                 qty: item.qty, // Default to sold qty
@@ -265,6 +319,7 @@ export default function SalesReturnPage() {
     const handleResetVerification = () => {
         setIsInvoiceVerified(false);
         setSearchInvoiceQuery("");
+        setInvoiceItems([]); // Clear persistent invoice items
         form.reset({
             branchId: branch?.id || 0,
             transactionDate: new Date(),
@@ -957,6 +1012,7 @@ export default function SalesReturnPage() {
                                                                         inputValue={searchItem}
                                                                         onInputChange={setSearchItem}
                                                                         renderLabel={(item) => <div className="flex flex-col"><span className="font-semibold">{item.name}</span></div>}
+                                                                        filterString={searchItem}
                                                                     />
                                                                     <FormMessage />
                                                                 </FormItem>

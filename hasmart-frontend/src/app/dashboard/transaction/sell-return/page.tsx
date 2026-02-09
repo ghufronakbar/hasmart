@@ -146,6 +146,7 @@ export default function SellReturnPage() {
     const barcodeInputRef = useRef<HTMLInputElement>(null);
     const [isScanning, setIsScanning] = useState(false);
     const [scannedItems, setScannedItems] = useState<Item[]>([]);
+    const [invoiceItems, setInvoiceItems] = useState<Item[]>([]); // Store items from verified invoice
 
     // Date Filter State
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -170,6 +171,32 @@ export default function SellReturnPage() {
         sort: "asc"
     });
 
+    // Cumulative item cache - stores all items ever fetched to ensure selected items stay visible
+    const [cachedItems, setCachedItems] = useState<Item[]>([]);
+
+    // Accumulate items from useItems into cache whenever new items are fetched
+    useEffect(() => {
+        const fetchedItems = items?.data;
+        if (fetchedItems && fetchedItems.length > 0) {
+            setCachedItems(prev => {
+                const map = new Map(prev.map(i => [i.id, i]));
+                fetchedItems.forEach(item => {
+                    const existing = map.get(item.id);
+                    if (!existing) {
+                        map.set(item.id, item);
+                    } else {
+                        const existingVariantCount = existing.masterItemVariants?.length || 0;
+                        const newVariantCount = item.masterItemVariants?.length || 0;
+                        if (newVariantCount > existingVariantCount) {
+                            map.set(item.id, item);
+                        }
+                    }
+                });
+                return Array.from(map.values());
+            });
+        }
+    }, [items?.data]);
+
     const [editingId, setEditingId] = useState<number | null>(null);
     const { data: sellReturnDetail, isLoading: isLoadingDetail } = useSellReturn(editingId);
 
@@ -180,35 +207,43 @@ export default function SellReturnPage() {
 
     const { data: sellInvoiceData, isFetching: isCheckingInvoice, error: invoiceCheckError } = useSellByInvoice(searchInvoiceQuery);
 
-    // Merge list items with detail items
+    // Merge cached items with detail items, invoice items, and scanned items
     const itemOptions = useMemo(() => {
-        const listItems = items?.data || [];
+        const map = new Map();
+
+        const addOrMergeItem = (item: Item) => {
+            if (!item || !item.id) return;
+            const existing = map.get(item.id);
+            if (!existing) {
+                map.set(item.id, item);
+            } else {
+                const existingVariantCount = existing.masterItemVariants?.length || 0;
+                const newVariantCount = item.masterItemVariants?.length || 0;
+                if (newVariantCount > existingVariantCount) {
+                    map.set(item.id, item);
+                }
+            }
+        };
+
+        // Add all sources - cachedItems contains all fetched items across search queries
+        cachedItems.forEach(addOrMergeItem);
+
         // Include items from detail if editing
-        let detailItems: Item[] = [];
         if (editingId && sellReturnDetail?.data?.items) {
-            detailItems = sellReturnDetail.data.items.map((pi: SellReturnItem) => pi.masterItem).filter((i): i is Item => !!i);
-        }
-        // Include items from checked invoice if verifying
-        if (!editingId && sellInvoiceData?.data?.items) {
-            // Mapping from Sell Items to Master Items is tricky if backend doesn't return full nested masterItem structure
-            // Assuming sellInvoiceData items structure includes nested masterItem.
-            // Based on service definition: transactionSellItems include masterItem.
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            detailItems = sellInvoiceData.data.items.map((si: any) => si.masterItem).filter((i: Item) => !!i);
+            const detailItems = sellReturnDetail.data.items.map((pi: SellReturnItem) => pi.masterItem).filter((i): i is Item => !!i);
+            detailItems.forEach(addOrMergeItem);
         }
 
-        // Use Map to deduplicate by ID
-        const map = new Map();
-        listItems.forEach(i => map.set(i.id, i));
-        detailItems.forEach(i => {
-            if (i && i.id) map.set(i.id, i);
-        });
-        scannedItems.forEach(i => {
-            if (i && i.id) map.set(i.id, i);
-        });
+        // Include items from verified invoice (using persistent state)
+        if (!editingId && invoiceItems.length > 0) {
+            invoiceItems.forEach(addOrMergeItem);
+        }
+
+        // Include scanned items
+        scannedItems.forEach(addOrMergeItem);
 
         return Array.from(map.values());
-    }, [items?.data, sellReturnDetail, editingId, sellInvoiceData, scannedItems]);
+    }, [cachedItems, sellReturnDetail, editingId, invoiceItems, scannedItems]);
 
     const { mutate: createSellReturn, isPending: isCreating } = useCreateSellReturn();
     const { mutate: updateSellReturn, isPending: isUpdating } = useUpdateSellReturn();
@@ -251,9 +286,16 @@ export default function SellReturnPage() {
                 setMemberVerified(invoice.masterMember);
             }
 
+            // Extract and store masterItems for itemOptions (persistent state)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const invoiceItemsData = invoice.items || invoice.transactionSellItems || [];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const extractedMasterItems = invoiceItemsData.map((item: any) => item.masterItem).filter((i: Item) => !!i);
+            setInvoiceItems(extractedMasterItems);
+
             // Populate items
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const mappedItems = (invoice.items || []).map((item: any) => ({
+            const mappedItems = invoiceItemsData.map((item: any) => ({
                 masterItemId: item.masterItemId,
                 masterItemVariantId: item.masterItemVariantId,
                 qty: item.qty, // Default to full return? Let's assume so or 1? 
@@ -288,6 +330,7 @@ export default function SellReturnPage() {
             setInvoiceToCheck("");
             setSearchInvoiceQuery("");
             setSearchItem("");
+            setInvoiceItems([]); // Clear persistent invoice items
             form.reset({
                 branchId: branch?.id,
                 transactionDate: new Date(),
@@ -1009,6 +1052,7 @@ export default function SellReturnPage() {
                                                                                 inputValue={searchItem}
                                                                                 onInputChange={setSearchItem}
                                                                                 renderLabel={(item) => <div className="flex flex-col"><span className="font-semibold">{item.name}</span></div>}
+                                                                                filterString={searchItem}
                                                                             />
                                                                             <FormMessage />
                                                                         </FormItem>

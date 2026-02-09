@@ -173,28 +173,60 @@ export default function SellPage() {
         sort: "asc"
     });
 
+    // Cumulative item cache - stores all items ever fetched to ensure selected items stay visible
+    const [cachedItems, setCachedItems] = useState<Item[]>([]);
+
+    // Accumulate items from useItems into cache whenever new items are fetched
+    useEffect(() => {
+        const fetchedItems = items?.data;
+        if (fetchedItems && fetchedItems.length > 0) {
+            setCachedItems(prev => {
+                const map = new Map(prev.map(i => [i.id, i]));
+                fetchedItems.forEach(item => {
+                    const existing = map.get(item.id);
+                    if (!existing) {
+                        map.set(item.id, item);
+                    } else {
+                        const existingVariantCount = existing.masterItemVariants?.length || 0;
+                        const newVariantCount = item.masterItemVariants?.length || 0;
+                        if (newVariantCount > existingVariantCount) {
+                            map.set(item.id, item);
+                        }
+                    }
+                });
+                return Array.from(map.values());
+            });
+        }
+    }, [items?.data]);
+
     const [editingId, setEditingId] = useState<number | null>(null);
     const { data: sellDetail, isLoading: isLoadingDetail } = useSell(editingId);
 
-    // Merge list items with detail items
+    // Merge cached items with detail items and scanned items
     const itemOptions = useMemo(() => {
-        const listItems = items?.data || [];
-        // if (!editingId || !sellDetail?.data) return listItems; // Keep consistent
-
         const detailItems = sellDetail?.data?.items?.map(pi => pi.masterItem).filter((i): i is Item => !!i) || [];
 
-        // Use Map to deduplicate by ID
         const map = new Map();
-        listItems.forEach(i => map.set(i.id, i));
-        detailItems.forEach(i => {
-            if (i && i.id) map.set(i.id, i);
-        });
-        scannedItems.forEach(i => {
-            if (i && i.id) map.set(i.id, i);
-        });
+        const addOrMergeItem = (item: Item) => {
+            if (!item || !item.id) return;
+            const existing = map.get(item.id);
+            if (!existing) {
+                map.set(item.id, item);
+            } else {
+                const existingVariantCount = existing.masterItemVariants?.length || 0;
+                const newVariantCount = item.masterItemVariants?.length || 0;
+                if (newVariantCount > existingVariantCount) {
+                    map.set(item.id, item);
+                }
+            }
+        };
+
+        cachedItems.forEach(addOrMergeItem);
+        detailItems.forEach(addOrMergeItem);
+        scannedItems.forEach(addOrMergeItem);
 
         return Array.from(map.values());
-    }, [items?.data, sellDetail, editingId, scannedItems]);
+    }, [cachedItems, sellDetail, scannedItems]);
 
     const { mutate: createSell, isPending: isCreating } = useCreateSell();
     const { mutate: updateSell, isPending: isUpdating } = useUpdateSell();
@@ -876,6 +908,7 @@ export default function SellPage() {
                                                                         inputValue={searchItem}
                                                                         onInputChange={setSearchItem}
                                                                         renderLabel={(item) => <div className="flex flex-col"><span className="font-semibold">{item.name}</span></div>}
+                                                                        filterString={searchItem}
                                                                     />
                                                                     <FormMessage />
                                                                 </FormItem>

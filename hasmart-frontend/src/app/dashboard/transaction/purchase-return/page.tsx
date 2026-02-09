@@ -140,6 +140,7 @@ export default function PurchaseReturnPage() {
     const [isScanning, setIsScanning] = useState(false);
     const barcodeInputRef = useRef<HTMLInputElement>(null);
     const [scannedItems, setScannedItems] = useState<Item[]>([]);
+    const [invoiceItems, setInvoiceItems] = useState<Item[]>([]); // Store items from verified invoice
 
     // --- Combobox Search States ---
     const [searchItem, setSearchItem] = useState("");
@@ -174,6 +175,32 @@ export default function PurchaseReturnPage() {
         sortBy: "name",
         sort: "asc"
     });
+
+    // Cumulative item cache - stores all items ever fetched to ensure selected items stay visible
+    const [cachedItems, setCachedItems] = useState<Item[]>([]);
+
+    // Accumulate items from useItems into cache whenever new items are fetched
+    useEffect(() => {
+        const fetchedItems = items?.data;
+        if (fetchedItems && fetchedItems.length > 0) {
+            setCachedItems(prev => {
+                const map = new Map(prev.map(i => [i.id, i]));
+                fetchedItems.forEach(item => {
+                    const existing = map.get(item.id);
+                    if (!existing) {
+                        map.set(item.id, item);
+                    } else {
+                        const existingVariantCount = existing.masterItemVariants?.length || 0;
+                        const newVariantCount = item.masterItemVariants?.length || 0;
+                        if (newVariantCount > existingVariantCount) {
+                            map.set(item.id, item);
+                        }
+                    }
+                });
+                return Array.from(map.values());
+            });
+        }
+    }, [items?.data]);
 
     const [editingId, setEditingId] = useState<number | null>(null);
     const { data: purchaseReturnDetail, isLoading: isLoadingDetail } = usePurchaseReturn(editingId);
@@ -227,6 +254,12 @@ export default function PurchaseReturnPage() {
     useEffect(() => {
         if (purchaseInvoiceData?.data && !editingId && submittedInvoiceQuery) {
             const invoice = purchaseInvoiceData.data;
+
+            // DEBUG: Log full invoice structure
+            console.log('[DEBUG] purchaseInvoiceData.data:', invoice);
+            console.log('[DEBUG] invoice.items:', invoice.items);
+            console.log('[DEBUG] invoice.transactionPurchaseItems:', invoice.transactionPurchaseItems);
+
             // Populate form
             setIsInvoiceVerified(true);
             form.setValue("originalInvoiceNumber", invoice.invoiceNumber);
@@ -234,8 +267,16 @@ export default function PurchaseReturnPage() {
             form.setValue("masterSupplierId", invoice.masterSupplierId);
             form.setValue("taxPercentage", parseFloat(String(invoice.recordedTaxPercentage ?? 0)));
 
-            // Map items
-            const newItems = invoice.items.map(item => ({
+            // Map items - use transactionPurchaseItems if items is not available (backend returns transactionPurchaseItems)
+            const invoiceItemsData = invoice.items || invoice.transactionPurchaseItems || [];
+            console.log('[DEBUG] invoiceItems used for mapping:', invoiceItemsData);
+
+            // Extract and store masterItems for itemOptions (persistent state)
+            const extractedMasterItems = invoiceItemsData.map(item => item.masterItem).filter((i): i is Item => !!i);
+            console.log('[DEBUG] Extracted masterItems to store:', extractedMasterItems);
+            setInvoiceItems(extractedMasterItems);
+
+            const newItems = invoiceItemsData.map(item => ({
                 masterItemId: item.masterItemId,
                 masterItemVariantId: item.masterItemVariantId,
                 qty: item.qty, // Default to bought qty, user can reduce
@@ -243,6 +284,7 @@ export default function PurchaseReturnPage() {
                 discounts: item.discounts?.map(d => ({ percentage: parseFloat(d.percentage) })) || []
             }));
 
+            console.log('[DEBUG] newItems to set in form:', newItems);
             form.setValue("items", newItems);
             toast.success("Invoice ditemukan");
             setSubmittedInvoiceQuery(""); // specific reset
@@ -262,6 +304,7 @@ export default function PurchaseReturnPage() {
     const handleResetVerification = () => {
         setIsInvoiceVerified(false);
         setSearchInvoiceQuery("");
+        setInvoiceItems([]); // Clear persistent invoice items
         form.reset({
             branchId: branch?.id || 0,
             transactionDate: new Date(),
@@ -274,26 +317,45 @@ export default function PurchaseReturnPage() {
         });
     };
 
-    // Merge list items with detail items
+    // Merge cached items with detail items, invoice items, and scanned items
     const itemOptions = useMemo(() => {
-        const listItems = items?.data || [];
-        if (!editingId || !purchaseReturnDetail?.data) return listItems;
-
-        const detailItems = purchaseReturnDetail.data.items?.map(pi => pi.masterItem).filter((i): i is Item => !!i) || [];
-
-        // Use Map to deduplicate by ID
         const map = new Map();
-        listItems.forEach(i => map.set(i.id, i));
-        detailItems.forEach(i => {
-            if (i && i.id) map.set(i.id, i);
-        });
 
-        scannedItems.forEach(i => {
-            if (i && i.id) map.set(i.id, i);
-        });
+        // Helper function to add or merge item
+        const addOrMergeItem = (item: Item) => {
+            if (!item || !item.id) return;
+
+            const existing = map.get(item.id);
+            if (!existing) {
+                map.set(item.id, item);
+            } else {
+                const existingVariantCount = existing.masterItemVariants?.length || 0;
+                const newVariantCount = item.masterItemVariants?.length || 0;
+                if (newVariantCount > existingVariantCount) {
+                    map.set(item.id, item);
+                }
+            }
+        };
+
+        // Add all sources - cachedItems contains all fetched items across search queries
+        cachedItems.forEach(addOrMergeItem);
+
+        // Include items from detail if editing
+        if (editingId && purchaseReturnDetail?.data) {
+            const detailItems = purchaseReturnDetail.data.items?.map(pi => pi.masterItem).filter((i): i is Item => !!i) || [];
+            detailItems.forEach(addOrMergeItem);
+        }
+
+        // Include items from verified invoice (using persistent state)
+        if (!editingId && invoiceItems.length > 0) {
+            invoiceItems.forEach(addOrMergeItem);
+        }
+
+        // Include scanned items
+        scannedItems.forEach(addOrMergeItem);
 
         return Array.from(map.values());
-    }, [items?.data, purchaseReturnDetail, editingId, scannedItems]);
+    }, [cachedItems, purchaseReturnDetail, editingId, invoiceItems, scannedItems]);
 
     // Merge detail supplier if editing (to ensure it shows up)
     const supplierOptions = useMemo(() => {
@@ -874,6 +936,7 @@ export default function PurchaseReturnPage() {
                                                     onInputChange={setSearchSupplier}
                                                     renderLabel={(item) => <div className="flex flex-col"><span className="font-semibold">{item.code} ({item.name})</span><span className="text-[10px] text-muted-foreground">{(item as unknown as { masterItemCategory?: { name: string } }).masterItemCategory?.name}</span></div>}
                                                     disabled // Readonly because tied to invoice
+                                                    filterString={searchSupplier}
                                                 />
                                                 <FormMessage />
                                             </FormItem>
@@ -963,6 +1026,7 @@ export default function PurchaseReturnPage() {
                                                                         inputValue={searchItem}
                                                                         onInputChange={setSearchItem}
                                                                         renderLabel={(item) => <div className="flex flex-col"><span className="font-semibold">{item.name}</span></div>}
+                                                                        filterString={searchItem}
                                                                     />
                                                                     <FormMessage />
                                                                 </FormItem>

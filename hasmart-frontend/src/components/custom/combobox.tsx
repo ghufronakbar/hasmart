@@ -44,6 +44,7 @@ export interface ComboboxProps {
     inputValue?: string;
     onInputChange?: (val: string) => void;
     inputId?: string;
+    filterString: string;
 }
 
 export const Combobox = ({
@@ -57,7 +58,8 @@ export const Combobox = ({
     className,
     inputValue,
     onInputChange,
-    inputId
+    inputId,
+    filterString,
 }: ComboboxProps) => {
     const [open, setOpen] = useState(false);
     const selected = options?.find((item) => item.id === value);
@@ -88,7 +90,7 @@ export const Combobox = ({
                     <CommandList>
                         <CommandEmpty>Tidak ditemukan.</CommandEmpty>
                         <CommandGroup>
-                            {options?.map((item) => (
+                            {options?.filter((item) => item.name.toLowerCase().includes(filterString.toLowerCase()))?.map((item) => (
                                 <CommandItem
                                     key={item.id}
                                     value={`${item.code || ''} ${item.name}`}

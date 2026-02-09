@@ -145,7 +145,8 @@ export default function AdjustStockPage() {
     // --- Search & Cache States ---
     const [searchItem, setSearchItem] = useState("");
     const debouncedSearchItem = useDebounce(searchItem, 200);
-    const [selectedItemsCache, setSelectedItemsCache] = useState<Record<number, Item>>({});
+    // Standardizing on cachedItems pattern like other transaction pages
+    const [cachedItems, setCachedItems] = useState<Item[]>([]);
 
     // Queries
     const { data: adjustments, isLoading } = useAdjustStocks({
@@ -267,7 +268,10 @@ export default function AdjustStockPage() {
                     }
 
                     // Add to cache to ensure it's valid for Combobox
-                    setSelectedItemsCache(prev => ({ ...prev, [item.id]: item }));
+                    setCachedItems(prev => {
+                        if (prev.find(i => i.id === item.id)) return prev;
+                        return [...prev, item];
+                    });
 
                     // Check if item already exists in list
                     const currentItems = form.getValues("items");
@@ -365,45 +369,71 @@ export default function AdjustStockPage() {
         idNotIns, // Exclude selected items
     });
 
-    const itemsList = items?.data || [];
-
-    // Helper to get options for a specific row
-    const getRowOptions = (currentValue: number) => {
-        const cached = selectedItemsCache[currentValue];
-        // If cached item exists, prepend it. Deduplicate just in case.
-        if (cached) {
-            const exists = itemsList.find(i => i.id === cached.id);
-            if (!exists) return [cached, ...itemsList];
-        }
-        return itemsList;
-    };
-
-    // Update cache when detail loads
-    // Update cache when detail loads
+    // Accumulate items from useItems and detail into cache
     useEffect(() => {
-        if (detailData?.data?.items) {
-            setSelectedItemsCache(prev => {
-                const newCache = { ...prev };
-                let hasChange = false;
-                detailData?.data?.items?.forEach(item => {
-                    if (item.masterItem && !newCache[item.masterItem.id]) {
-                        newCache[item.masterItem.id] = item.masterItem;
-                        hasChange = true;
+        const fetchedItems = items?.data;
+        if (fetchedItems && fetchedItems.length > 0) {
+            setCachedItems(prev => {
+                const map = new Map(prev.map(i => [i.id, i]));
+                fetchedItems.forEach(item => {
+                    const existing = map.get(item.id);
+                    if (!existing) {
+                        map.set(item.id, item);
+                    } else {
+                        const existingVariantCount = existing.masterItemVariants?.length || 0;
+                        const newVariantCount = item.masterItemVariants?.length || 0;
+                        if (newVariantCount > existingVariantCount) {
+                            map.set(item.id, item);
+                        }
                     }
                 });
-                return hasChange ? newCache : prev;
+                return Array.from(map.values());
             });
+        }
+    }, [items?.data]);
+
+    // Also cache items from detail data
+    useEffect(() => {
+        if (detailData?.data?.items) {
+            const detailItems = detailData.data.items.map(i => i.masterItem).filter((i): i is Item => !!i);
+            if (detailItems.length > 0) {
+                setCachedItems(prev => {
+                    const map = new Map(prev.map(i => [i.id, i]));
+                    detailItems.forEach(item => {
+                        if (!map.has(item.id)) map.set(item.id, item);
+                    });
+                    return Array.from(map.values());
+                });
+            }
         }
     }, [detailData]);
 
-    // Update cache on selection
-    const handleItemSelect = (index: number, itemId: number) => {
-        // Find in current list
-        const item = itemsList.find(i => i.id === itemId);
-        if (item) {
-            setSelectedItemsCache(prev => ({ ...prev, [item.id]: item }));
-        }
+    const itemOptions = useMemo(() => {
+        const listItems = items?.data || [];
+        const map = new Map();
 
+        const addOrMergeItem = (item: Item) => {
+            if (!item || !item.id) return;
+            const existing = map.get(item.id);
+            if (!existing) {
+                map.set(item.id, item);
+            } else {
+                const existingVariantCount = existing.masterItemVariants?.length || 0;
+                const newVariantCount = item.masterItemVariants?.length || 0;
+                if (newVariantCount > existingVariantCount) {
+                    map.set(item.id, item);
+                }
+            }
+        };
+
+        cachedItems.forEach(addOrMergeItem);
+        listItems.forEach(addOrMergeItem);
+
+        return Array.from(map.values());
+    }, [cachedItems, items?.data]);
+
+    // Update cache on selection - simplified
+    const handleItemSelect = (index: number, itemId: number) => {
         form.setValue(`items.${index}.masterItemId`, itemId);
         form.setValue(`items.${index}.masterItemVariantId`, 0); // Reset variant
     };
@@ -693,7 +723,7 @@ export default function AdjustStockPage() {
                                         {fields.map((field, index) => {
                                             const selectedItemId = watchedItems?.[index]?.masterItemId;
                                             // Get item details from cache or current list
-                                            const selectedItem = itemsList.find(i => i.id === selectedItemId) || selectedItemsCache[selectedItemId];
+                                            const selectedItem = itemOptions.find(i => i.id === selectedItemId);
                                             const variants = selectedItem?.masterItemVariants || [];
 
 
@@ -711,12 +741,13 @@ export default function AdjustStockPage() {
                                                                     inputId={`item-select-${index}`}
                                                                     value={field.value}
                                                                     onChange={(val) => handleItemSelect(index, val)}
-                                                                    options={getRowOptions(field.value)}
+                                                                    options={itemOptions}
                                                                     placeholder="Pilih Barang"
                                                                     className="w-full"
                                                                     inputValue={searchItem}
                                                                     onInputChange={setSearchItem}
                                                                     renderLabel={(item) => <div className="flex flex-col"><span className="font-semibold">{item.name}</span></div>}
+                                                                    filterString={searchItem}
                                                                 />
                                                                 <FormMessage />
                                                             </FormItem>

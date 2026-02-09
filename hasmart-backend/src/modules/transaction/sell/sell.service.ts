@@ -237,12 +237,20 @@ export class SellService extends BaseService {
                     unit: true,
                     amount: true,
                     sellPrice: true,
+                    masterItem: {
+                      select: { id: true, name: true, code: true },
+                    },
                   },
                 },
               },
             },
             masterItemVariant: {
-              select: { id: true, unit: true, amount: true },
+              select: {
+                id: true,
+                unit: true,
+                amount: true,
+                masterItem: { select: { id: true, name: true, code: true } },
+              },
             },
             transactionSellDiscounts: {
               where: { deletedAt: null },
