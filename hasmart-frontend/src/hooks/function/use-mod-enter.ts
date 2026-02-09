@@ -1,4 +1,4 @@
-// useModEnter.ts
+// use-mod-enter.ts
 import { useHotkey } from "./use-hot-key";
 
 type UseModEnterOptions = Parameters<typeof useHotkey>[2];

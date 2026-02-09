@@ -121,6 +121,7 @@ import { ActionBranchButton } from "@/components/custom/action-branch-button";
 import { useModEnter } from "@/hooks/function/use-mod-enter";
 import { useAccessControl, UserAccess } from "@/hooks/use-access-control";
 import { itemService } from "@/services";
+import { useF2 } from "@/hooks/function/use-f2";
 
 type CreatePurchaseFormValues = z.infer<typeof createPurchaseSchema>;
 type PurchaseItemFormValues = z.infer<typeof purchaseItemSchema>;
@@ -447,25 +448,34 @@ export default function PurchasePage() {
     };
 
     // Focus management for new items
-    const [lastAddedIndex, setLastAddedIndex] = useState<number | null>(null);
+    // Focus management for new items
+    const [focusTarget, setFocusTarget] = useState<{ index: number, type: 'item' | 'qty' } | null>(null);
+
+    // Trigger focus when target changes or fields length changes (render update)
+    const [focusTrigger, setFocusTrigger] = useState(0);
 
     useEffect(() => {
-        if (lastAddedIndex !== null) {
-            const element = document.getElementById(`item-select-${lastAddedIndex}`);
-            if (element) {
-                element.focus();
-                // Reset after focusing
-                setLastAddedIndex(null);
-            }
+        if (focusTarget !== null) {
+            // Wait for render
+            setTimeout(() => {
+                if (focusTarget.type === 'item') {
+                    const element = document.getElementById(`item-select-${focusTarget.index}`);
+                    element?.focus();
+                } else if (focusTarget.type === 'qty') {
+                    const element = document.getElementById(`qty-input-${focusTarget.index}`) as HTMLInputElement;
+                    if (element) {
+                        element.focus();
+                        element.select(); // Auto select for overwrite
+                    }
+                }
+            }, 50);
         }
-    }, [lastAddedIndex, fields.length]); // Depend on fields.length to wait for render
+    }, [focusTarget, focusTrigger, fields.length]); // Depend on fields.length to wait for render
 
     const handleNewItem = () => {
         append({ masterItemId: 0, masterItemVariantId: 0, qty: 1, purchasePrice: 0, discounts: [] });
-        // Set target index to focus (length is before append in current render, so it will be index = current length)
-        // Actually append updates state, so we need to wait for render. 
-        // fields.length will increase by 1. The index of new item will be old length.
-        setLastAddedIndex(fields.length);
+        // Set target to focus new item
+        setFocusTarget({ index: fields.length, type: 'item' });
     }
 
     useModEnter(() => handleNewItem(), {
@@ -509,38 +519,51 @@ export default function PurchasePage() {
                         return [...prev, item];
                     });
 
-                    // Check if item already exists in list (same item & variant)
+                    // Check if item already exists in list
                     const currentItems = form.getValues("items");
-                    const existingIndex = currentItems.findIndex(
+
+                    // 1. Check for Exact Match (Same Item + Same Variant)
+                    // If multiple, pick last? Or first? Let's pick last added usually implies working on it.
+                    // But standard findIndex picks first. Let's stick to first for simplicity.
+                    const exactMatchIndex = currentItems.findIndex(
                         line => line.masterItemId === item.id && line.masterItemVariantId === baseVariant.id
                     );
 
-                    if (existingIndex >= 0) {
-                        // Update Qty
-                        const existingItem = currentItems[existingIndex];
-                        const newQty = Number(existingItem.qty) + 1;
-                        form.setValue(`items.${existingIndex}.qty`, newQty);
-
-                        // Highlight/Focus existing row?
-                        setLastAddedIndex(existingIndex);
-                        toast.success(`${item.name} (+1)`);
+                    if (exactMatchIndex >= 0) {
+                        // EXACT MATCH: + Focus
+                        setFocusTarget({ index: exactMatchIndex, type: 'qty' });
+                        setFocusTrigger(prev => prev + 1);
+                        toast.success(`${item.name} sudah ada`);
                     } else {
-                        // Append new item
-                        // Use recordedBuyPrice if available on item (mapped from backend), else 0
-                        const itemWithPrice = item as { recordedBuyPrice?: string };
-                        const buyPrice = itemWithPrice.recordedBuyPrice ? parseFloat(itemWithPrice.recordedBuyPrice) : 0;
+                        // 2. Check for Item Match (Different Variant)
+                        const itemMatchIndex = currentItems.findIndex(
+                            line => line.masterItemId === item.id
+                        );
 
-                        append({
-                            masterItemId: item.id,
-                            masterItemVariantId: baseVariant.id, // Use baseVariant.id, NOT item.masterItemVariants[0].id
-                            qty: 1,
-                            purchasePrice: buyPrice,
-                            discounts: [],
-                        });
-                        setLastAddedIndex(fields.length); // length will be index of new item
-                        toast.success(`${item.name} ditambahkan`);
+                        if (itemMatchIndex >= 0) {
+                            // PARTIAL MATCH: Just Focus Qty (No Increment)
+                            setFocusTarget({ index: itemMatchIndex, type: 'qty' });
+                            setFocusTrigger(prev => prev + 1);
+                            toast.info(`${item.name} sudah ada (beda variant). Fokus ke Qty.`);
+                        } else {
+                            // 3. NO MATCH: Append New Item
+                            // Use recordedBuyPrice if available on item (mapped from backend), else 0
+                            const itemWithPrice = item as { recordedBuyPrice?: string };
+                            const buyPrice = itemWithPrice.recordedBuyPrice ? parseFloat(itemWithPrice.recordedBuyPrice) : 0;
+
+                            append({
+                                masterItemId: item.id,
+                                masterItemVariantId: baseVariant.id,
+                                qty: 1,
+                                purchasePrice: buyPrice,
+                                discounts: [],
+                            });
+
+                            setFocusTarget({ index: fields.length, type: 'qty' });
+                            setFocusTrigger(prev => prev + 1);
+                            toast.success(`${item.name} ditambahkan`);
+                        }
                     }
-
                 } else {
                     toast.error("Item tidak ditemukan");
                 }
@@ -549,11 +572,13 @@ export default function PurchasePage() {
                 toast.error("Kode tidak ditemukan atau terjadi kesalahan");
             } finally {
                 setIsScanning(false);
-                // Keep focus
-                barcodeInputRef.current?.focus();
             }
         }
     };
+
+    useF2(() => {
+        barcodeInputRef.current?.focus();
+    });
 
 
     // Delete Logic
@@ -892,7 +917,19 @@ export default function PurchasePage() {
                                                             <FormField control={form.control} name={`items.${index}.qty`} render={({ field }) => (
                                                                 <FormItem>
                                                                     <FormLabel className="text-xs">Qty</FormLabel>
-                                                                    <FormControl><Input type="number" {...field} /></FormControl>
+                                                                    <FormControl>
+                                                                        <Input
+                                                                            type="number"
+                                                                            {...field}
+                                                                            id={`qty-input-${index}`}
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === "Enter") {
+                                                                                    e.preventDefault();
+                                                                                    barcodeInputRef.current?.focus();
+                                                                                }
+                                                                            }}
+                                                                        />
+                                                                    </FormControl>
                                                                 </FormItem>
                                                             )} />
                                                         </div>

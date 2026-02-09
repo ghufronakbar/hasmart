@@ -10,6 +10,7 @@ import { useBranch } from "@/providers/branch-provider";
 // --- Item Hooks ---
 
 export function useItems(
+  // idNotIns is comma separated string of ids to exclude from the list
   params?: FilterQuery & { idNotIns?: string; onlyActive?: boolean },
 ) {
   const { branch } = useBranch();
