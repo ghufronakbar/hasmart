@@ -90,6 +90,7 @@ import { Combobox } from "@/components/custom/combobox";
 import { ActionBranchButton } from "@/components/custom/action-branch-button";
 import { useAccessControl, UserAccess } from "@/hooks/use-access-control";
 import { itemService } from "@/services";
+import { useF2 } from "@/hooks/function/use-f2";
 
 // --- Types & Schemas ---
 
@@ -299,6 +300,27 @@ export default function SalesReturnPage() {
         enabled: true,
     });
 
+    // Focus management
+    const [focusTarget, setFocusTarget] = useState<{ index: number, type: 'item' | 'qty' } | null>(null);
+    const [focusTrigger, setFocusTrigger] = useState(0);
+
+    useEffect(() => {
+        if (focusTarget !== null) {
+            setTimeout(() => {
+                if (focusTarget.type === 'item') {
+                    const element = document.getElementById(`item-select-${focusTarget.index}`);
+                    element?.focus();
+                } else if (focusTarget.type === 'qty') {
+                    const element = document.getElementById(`qty-input-${focusTarget.index}`) as HTMLInputElement;
+                    if (element) {
+                        element.focus();
+                        element.select();
+                    }
+                }
+            }, 50);
+        }
+    }, [focusTarget, focusTrigger, fields.length]);
+
     // Handle Barcode Scan
     const handleScan = async (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === "Enter") {
@@ -336,38 +358,46 @@ export default function SalesReturnPage() {
                         return [...prev, item];
                     });
 
-                    // Check if item already exists in list (same item & variant)
+                    // Check if item already exists in list
                     const currentItems = form.getValues("items");
-                    const existingIndex = currentItems.findIndex(
+
+                    const exactMatchIndex = currentItems.findIndex(
                         line => line.masterItemId === item.id && line.masterItemVariantId === baseVariant.id
                     );
 
-                    if (existingIndex >= 0) {
-                        // Update Qty
-                        const existingItem = currentItems[existingIndex];
-                        const newQty = Number(existingItem.qty) + 1;
-                        form.setValue(`items.${existingIndex}.qty`, newQty);
-
-                        // Highlight/Focus existing row?
-                        setLastAddedIndex(existingIndex);
-                        toast.success(`${item.name} (+1)`);
+                    if (exactMatchIndex >= 0) {
+                        // EXACT MATCH: Focus Only
+                        setFocusTarget({ index: exactMatchIndex, type: 'qty' });
+                        setFocusTrigger(prev => prev + 1);
+                        toast.success(`${item.name} sudah ada`);
                     } else {
-                        // Append new item
-                        // Use recordedSellPrice if available on item (mapped from backend), else 0
-                        const itemWithPrice = item
-                        const sellPrice = parseFloat(itemWithPrice.masterItemVariants.find(v => v.isBaseUnit)?.sellPrice || "0") || 0;
+                        const itemMatchIndex = currentItems.findIndex(
+                            line => line.masterItemId === item.id
+                        );
 
-                        append({
-                            masterItemId: item.id,
-                            masterItemVariantId: baseVariant.id,
-                            qty: 1,
-                            salesPrice: sellPrice, // Assuming sales return also uses totalPrice logic like sales?
-                            discounts: [],
-                        });
-                        setLastAddedIndex(fields.length); // length will be index of new item
-                        toast.success(`${item.name} ditambahkan`);
+                        if (itemMatchIndex >= 0) {
+                            // PARTIAL MATCH: Focus Only
+                            setFocusTarget({ index: itemMatchIndex, type: 'qty' });
+                            setFocusTrigger(prev => prev + 1);
+                            toast.info(`${item.name} sudah ada`);
+                        } else {
+                            // NO MATCH: Append New Item
+                            const itemWithPrice = item
+                            const sellPrice = parseFloat(itemWithPrice.masterItemVariants.find(v => v.isBaseUnit)?.sellPrice || "0") || 0;
+
+                            append({
+                                masterItemId: item.id,
+                                masterItemVariantId: baseVariant.id,
+                                qty: 1,
+                                salesPrice: sellPrice,
+                                discounts: [],
+                            });
+
+                            setFocusTarget({ index: fields.length, type: 'qty' });
+                            setFocusTrigger(prev => prev + 1);
+                            toast.success(`${item.name} ditambahkan`);
+                        }
                     }
-
                 } else {
                     toast.error("Item tidak ditemukan");
                 }
@@ -376,11 +406,13 @@ export default function SalesReturnPage() {
                 toast.error("Kode tidak ditemukan atau terjadi kesalahan");
             } finally {
                 setIsScanning(false);
-                // Keep focus
-                barcodeInputRef.current?.focus();
             }
         }
     };
+
+    useF2(() => {
+        barcodeInputRef.current?.focus();
+    });
     const watchedItems = useWatch({ control: form.control, name: "items" }) as SalesReturnItemFormValues[];
 
     // Ensure branchId is set when branch context loads
@@ -878,7 +910,7 @@ export default function SalesReturnPage() {
                                                 <div className="relative">
                                                     <Input
                                                         ref={barcodeInputRef}
-                                                        placeholder="Scan Barcode / Ketik Kode Variant lalu Enter..."
+                                                        placeholder="Scan Barcode"
                                                         className="h-10 text-sm font-mono border-primary/50 focus-visible:ring-primary pl-9"
                                                         onKeyDown={handleScan}
                                                         disabled={isScanning}
@@ -887,6 +919,7 @@ export default function SalesReturnPage() {
                                                         {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                                                     </div>
                                                 </div>
+                                                <span className="text-muted-foreground/80 text-xs ml-2 font-normal">atau tekan F2 untuk fokus</span>
                                             </div>
                                             <div className="flex flex-col items-end gap-2">
                                                 <Button type="button" size="sm" onClick={handleNewItem}>
@@ -960,7 +993,18 @@ export default function SalesReturnPage() {
                                                                 <FormItem>
                                                                     <FormLabel className="text-xs">Qty</FormLabel>
                                                                     <FormControl>
-                                                                        <Input type="number" min="1" {...field} />
+                                                                        <Input
+                                                                            type="number"
+                                                                            min="1"
+                                                                            {...field}
+                                                                            id={`qty-input-${index}`}
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === "Enter") {
+                                                                                    e.preventDefault();
+                                                                                    barcodeInputRef.current?.focus();
+                                                                                }
+                                                                            }}
+                                                                        />
                                                                     </FormControl>
                                                                     <FormMessage />
                                                                 </FormItem>

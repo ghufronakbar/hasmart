@@ -94,6 +94,7 @@ import { DatePickerWithRange } from "@/components/custom/date-picker-with-range"
 import { Combobox } from "@/components/custom/combobox";
 import { ActionBranchButton } from "@/components/custom/action-branch-button";
 import { useAccessControl, UserAccess } from "@/hooks/use-access-control";
+import { useF2 } from "@/hooks/function/use-f2";
 
 // --- Types & Schemas ---
 
@@ -209,22 +210,29 @@ export default function AdjustStockPage() {
     };
 
     // Focus management for new items
-    const [lastAddedIndex, setLastAddedIndex] = useState<number | null>(null);
+    const [focusTarget, setFocusTarget] = useState<{ index: number, type: 'item' | 'qty' } | null>(null);
+    const [focusTrigger, setFocusTrigger] = useState(0);
 
     useEffect(() => {
-        if (lastAddedIndex !== null) {
-            const element = document.getElementById(`item-select-${lastAddedIndex}`);
-            if (element) {
-                element.focus();
-                // Reset after focusing
-                setLastAddedIndex(null);
-            }
+        if (focusTarget !== null) {
+            setTimeout(() => {
+                if (focusTarget.type === 'item') {
+                    const element = document.getElementById(`item-select-${focusTarget.index}`);
+                    element?.focus();
+                } else if (focusTarget.type === 'qty') {
+                    const element = document.getElementById(`qty-input-${focusTarget.index}`) as HTMLInputElement;
+                    if (element) {
+                        element.focus();
+                        element.select();
+                    }
+                }
+            }, 50);
         }
-    }, [lastAddedIndex, fields.length]); // Depend on fields.length to wait for render
+    }, [focusTarget, focusTrigger, fields.length]);
 
     const handleNewItem = () => {
         append({ masterItemId: 0, masterItemVariantId: 0, actualQty: 0 });
-        setLastAddedIndex(fields.length);
+        setFocusTarget({ index: fields.length, type: 'item' });
     }
 
     // Handle Barcode Scan
@@ -261,32 +269,41 @@ export default function AdjustStockPage() {
                     // Add to cache to ensure it's valid for Combobox
                     setSelectedItemsCache(prev => ({ ...prev, [item.id]: item }));
 
-                    // Check if item already exists in list (same item & variant)
+                    // Check if item already exists in list
                     const currentItems = form.getValues("items");
-                    const existingIndex = currentItems.findIndex(
+
+                    const exactMatchIndex = currentItems.findIndex(
                         line => line.masterItemId === item.id && line.masterItemVariantId === baseVariant.id
                     );
 
-                    if (existingIndex >= 0) {
-                        // Update Qty
-                        const existingItem = currentItems[existingIndex];
-                        const newQty = Number(existingItem.actualQty) + 1;
-                        form.setValue(`items.${existingIndex}.actualQty`, newQty);
-
-                        // Highlight/Focus existing row?
-                        setLastAddedIndex(existingIndex);
-                        toast.success(`${item.name} (+1)`);
+                    if (exactMatchIndex >= 0) {
+                        // EXACT MATCH: Focus Only
+                        setFocusTarget({ index: exactMatchIndex, type: 'qty' });
+                        setFocusTrigger(prev => prev + 1);
+                        toast.success(`${item.name} sudah ada`);
                     } else {
-                        // Append new item
-                        append({
-                            masterItemId: item.id,
-                            masterItemVariantId: baseVariant.id,
-                            actualQty: 1
-                        });
-                        setLastAddedIndex(fields.length); // length will be index of new item
-                        toast.success(`${item.name} ditambahkan`);
-                    }
+                        const itemMatchIndex = currentItems.findIndex(
+                            line => line.masterItemId === item.id
+                        );
 
+                        if (itemMatchIndex >= 0) {
+                            // PARTIAL MATCH: Focus Only
+                            setFocusTarget({ index: itemMatchIndex, type: 'qty' });
+                            setFocusTrigger(prev => prev + 1);
+                            toast.info(`${item.name} sudah ada`);
+                        } else {
+                            // NO MATCH: Append New Item
+                            append({
+                                masterItemId: item.id,
+                                masterItemVariantId: baseVariant.id,
+                                actualQty: 1
+                            });
+
+                            setFocusTarget({ index: fields.length, type: 'qty' });
+                            setFocusTrigger(prev => prev + 1);
+                            toast.success(`${item.name} ditambahkan`);
+                        }
+                    }
                 } else {
                     toast.error("Item tidak ditemukan");
                 }
@@ -295,11 +312,13 @@ export default function AdjustStockPage() {
                 toast.error("Kode tidak ditemukan atau terjadi kesalahan");
             } finally {
                 setIsScanning(false);
-                // Keep focus
-                barcodeInputRef.current?.focus();
             }
         }
     };
+
+    useF2(() => {
+        barcodeInputRef.current?.focus();
+    });
 
     const handleCreate = () => {
         setDetailId(null);
@@ -643,7 +662,7 @@ export default function AdjustStockPage() {
                                             <div className="relative">
                                                 <Input
                                                     ref={barcodeInputRef}
-                                                    placeholder="Scan Barcode / Ketik Kode Variant lalu Enter..."
+                                                    placeholder="Scan Barcode"
                                                     className="h-10 text-sm font-mono border-primary/50 focus-visible:ring-primary pl-9"
                                                     onKeyDown={handleScan}
                                                     disabled={isScanning}
@@ -652,6 +671,7 @@ export default function AdjustStockPage() {
                                                     {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                                                 </div>
                                             </div>
+                                            <span className="text-xs text-muted-foreground">atau tekan F2 untuk fokus</span>
                                         </div>
                                         <div className="flex flex-col items-end gap-2">
                                             <div className="flex gap-2">
@@ -733,7 +753,19 @@ export default function AdjustStockPage() {
                                                             <FormItem>
                                                                 <FormLabel className="text-xs font-bold text-primary">Total Fisik</FormLabel>
                                                                 <FormControl>
-                                                                    <Input type="number" min="0" {...field} onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} />
+                                                                    <Input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        {...field}
+                                                                        id={`qty-input-${index}`}
+                                                                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === "Enter") {
+                                                                                e.preventDefault();
+                                                                                barcodeInputRef.current?.focus();
+                                                                            }
+                                                                        }}
+                                                                    />
                                                                 </FormControl>
                                                                 <FormMessage />
                                                             </FormItem>

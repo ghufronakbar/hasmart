@@ -544,7 +544,7 @@ export default function PurchasePage() {
                             // PARTIAL MATCH: Just Focus Qty (No Increment)
                             setFocusTarget({ index: itemMatchIndex, type: 'qty' });
                             setFocusTrigger(prev => prev + 1);
-                            toast.info(`${item.name} sudah ada (beda variant). Fokus ke Qty.`);
+                            toast.info(`${item.name} sudah ada`);
                         } else {
                             // 3. NO MATCH: Append New Item
                             // Use recordedBuyPrice if available on item (mapped from backend), else 0
@@ -830,7 +830,7 @@ export default function PurchasePage() {
                                                 <div className="relative">
                                                     <Input
                                                         ref={barcodeInputRef}
-                                                        placeholder="Scan Barcode / Ketik Kode Variant lalu Enter..."
+                                                        placeholder="Scan Barcode"
                                                         className="h-10 text-sm font-mono border-primary/50 focus-visible:ring-primary pl-9"
                                                         onKeyDown={handleScan}
                                                         disabled={isScanning}
@@ -839,6 +839,7 @@ export default function PurchasePage() {
                                                         {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                                                     </div>
                                                 </div>
+                                                <span className="text-xs text-muted-foreground">atau tekan F2 untuk fokus</span>
                                             </div>
                                             <div className="flex flex-col items-end gap-2">
                                                 <Button type="button" size="sm" onClick={handleNewItem}>

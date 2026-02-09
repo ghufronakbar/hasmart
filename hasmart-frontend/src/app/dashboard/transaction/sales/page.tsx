@@ -784,6 +784,7 @@ export default function SalesPage() {
                                                         {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                                                     </div>
                                                 </div>
+                                                <span className="text-xs text-muted-foreground">atau tekan F2 untuk fokus</span>
                                             </div>
                                             <div className="flex flex-col items-end gap-2">
                                                 <Button type="button" size="sm" onClick={handleNewItem}>
