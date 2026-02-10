@@ -199,6 +199,7 @@ const purchaseRouter = new PurchaseRouter(purchaseController, jwtService);
 const purchaseReturnService = new PurchaseReturnService(
   prismaService,
   refreshStockService,
+  refreshBuyPriceService,
 );
 const purchaseReturnController = new PurchaseReturnController(
   purchaseReturnService,
