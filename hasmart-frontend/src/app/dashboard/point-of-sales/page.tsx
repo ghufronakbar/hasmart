@@ -611,6 +611,7 @@ export default function PointOfSalesPage() {
                                         className="w-full h-10"
                                         inputValue={searchItem}
                                         onInputChange={setSearchItem}
+                                        filterString={searchItem}
                                         renderLabel={(item) => (
                                             <div className="flex flex-col text-left">
                                                 <span className="font-semibold">{item.name}</span>

@@ -51,10 +51,12 @@ export interface CreateItemDTO {
 
 export interface UpdateItemDTO {
   name?: string;
+  code?: string;
   masterSupplierCode?: string;
   masterItemCategoryCode?: string;
   isActive?: boolean;
   masterItemVariants?: MasterItemVariantUpdateDTO[];
+  buyPrice?: number;
 }
 
 export interface MasterItemVariantUpdateDTO {

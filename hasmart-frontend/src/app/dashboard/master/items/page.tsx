@@ -67,7 +67,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 
-import { Item } from "@/types/master/item";
+import { Item, UpdateItemDTO } from "@/types/master/item";
 import {
     useItems,
     useCreateItem,
@@ -493,8 +493,9 @@ export default function ItemsPage() {
             // Edit mode - Send ALL variants including deleted ones
             if (!editingItem) return;
 
-            const itemData = { // UpdateItemDTO extended
+            const itemData: UpdateItemDTO = { // UpdateItemDTO extended
                 name: values.name,
+                code: values.code,
                 masterSupplierCode: values.masterSupplierCode,
                 masterItemCategoryCode: values.masterItemCategoryCode,
                 isActive: values.isActive,

@@ -358,6 +358,7 @@ export class ItemService extends BaseService {
     const item = await this.prisma.masterItem.findFirst({
       where: { id, deletedAt: null },
       select: {
+        code: true,
         recordedBuyPrice: true,
         itemBranches: {
           where: {
@@ -380,6 +381,33 @@ export class ItemService extends BaseService {
 
     if (!item) {
       throw new NotFoundError();
+    }
+    if (item.code?.toLowerCase() !== data.code?.toLowerCase()) {
+      // check code
+      const existingItem = await this.prisma.masterItem.findFirst({
+        where: {
+          code: { equals: data.code, mode: "insensitive" },
+        },
+        select: {
+          id: true,
+          deletedAt: true,
+        },
+      });
+      if (existingItem && existingItem.id !== id) {
+        if (existingItem.deletedAt === null) {
+          // jika ada dan aktif maka throw error
+          throw new BadRequestError("Kode item sudah digunakan");
+        } else {
+          // jika ada tapi sudah dihapus maka update code
+          // agar tidak bentrok dengan code yang baru
+          await this.prisma.masterItem.update({
+            where: { id: existingItem.id },
+            data: {
+              code: data.code + "_deleted",
+            },
+          });
+        }
+      }
     }
 
     let totalStock = 0;

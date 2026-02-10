@@ -52,6 +52,7 @@ export type MasterItemVariantUpdateType = z.infer<
 
 export const ItemUpdateBodySchema = z.object({
   name: z.string().min(1),
+  code: z.string().min(1),
   masterSupplierCode: z.string().min(1),
   masterItemCategoryCode: z.string().min(1),
   isActive: z.boolean(),
