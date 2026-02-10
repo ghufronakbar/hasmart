@@ -85,6 +85,7 @@ import { useAccessControl, UserAccess } from "@/hooks/use-access-control";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useItemBulkUpdateVariantPrice } from "@/hooks/master/use-item";
+import { cn } from "@/lib/utils";
 
 // --- Validation Schemas ---
 
@@ -131,6 +132,7 @@ type CreateItemFormValues = z.infer<typeof createItemSchema>;
 export default function ItemsPage() {
     useAccessControl([UserAccess.accessMasterItemRead], true);
     const hasAccess = useAccessControl([UserAccess.accessMasterItemWrite], false);
+    const hasReadBuyPrice = useAccessControl([UserAccess.accessShowBuyPrice], false);
     // --- State ---
     const [pagination, setPagination] = useState<PaginationState>({
         pageIndex: 0,
@@ -663,8 +665,12 @@ export default function ItemsPage() {
                             <TableHead>Variant</TableHead>
                             <TableHead>Unit</TableHead>
                             <TableHead>Konversi</TableHead>
-                            <TableHead>Harga Beli</TableHead>
-                            <TableHead>Estimasi Keuntungan</TableHead>
+                            {hasReadBuyPrice &&
+                                <>
+                                    <TableHead>Harga Beli</TableHead>
+                                    <TableHead>Estimasi Keuntungan</TableHead>
+                                </>
+                            }
                             <TableHead>Harga Jual</TableHead>
                             <TableHead className="text-right">Aksi</TableHead>
                         </TableRow>
@@ -728,12 +734,16 @@ export default function ItemsPage() {
                                         </TableCell>
                                         <TableCell>{variant.unit}</TableCell>
                                         <TableCell>{variant.amount}</TableCell>
-                                        <TableCell>
-                                            {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(parseFloat(item.recordedBuyPrice) * variant.amount)}
-                                        </TableCell>
-                                        <TableCell>
-                                            {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(parseFloat(variant.recordedProfitAmount))} ({variant.recordedProfitPercentage}%)
-                                        </TableCell>
+                                        {hasReadBuyPrice &&
+                                            <>
+                                                <TableCell>
+                                                    {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(parseFloat(item.recordedBuyPrice) * variant.amount)}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(parseFloat(variant.recordedProfitAmount))} ({variant.recordedProfitPercentage}%)
+                                                </TableCell>
+                                            </>
+                                        }
                                         <TableCell>
                                             <div className="flex items-center gap-2">
                                                 {isBulkMode && (
@@ -968,7 +978,7 @@ export default function ItemsPage() {
 
                                     {formMode === "edit" &&
                                         <FormField control={unifiedForm.control} name="buyPrice" render={({ field }) => (
-                                            <FormItem>
+                                            <FormItem className={hasReadBuyPrice ? "" : "hidden"}>
                                                 <FormLabel>Harga Beli</FormLabel>
                                                 <FormControl><Input placeholder="10000"  {...field} type="number" /></FormControl>
                                                 <FormMessage />
@@ -1078,14 +1088,14 @@ export default function ItemsPage() {
                                                             {formMode === "edit" &&
                                                                 <>
                                                                     <FormField control={unifiedForm.control} name={`masterItemVariants.${index}.buyPrice`} render={({ field }) => (
-                                                                        <FormItem className="w-full">
+                                                                        <FormItem className={cn("w-full", hasReadBuyPrice ? "" : "hidden")}>
                                                                             <FormLabel className="text-xs">Harga Beli</FormLabel>
                                                                             <FormControl><Input type="number" {...field} className="w-full" disabled /></FormControl>
                                                                             <FormMessage />
                                                                         </FormItem>
                                                                     )} />
                                                                     <FormField control={unifiedForm.control} name={`masterItemVariants.${index}.profitPercentage`} render={({ field }) => (
-                                                                        <FormItem className="w-full">
+                                                                        <FormItem className={cn("w-full", hasReadBuyPrice ? "" : "hidden")}>
                                                                             <FormLabel className="text-xs">Profit (%)</FormLabel>
                                                                             <FormControl><Input type="number" {...field} className="w-full" /></FormControl>
                                                                             <FormMessage />
