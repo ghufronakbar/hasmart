@@ -83,6 +83,7 @@ const createUserSchema = z.object({
     password: z.string().min(6, "Password minimal 6 karakter"),
     isActive: z.boolean(),
     // Access Fields
+    accessShowBuyPrice: z.boolean(),
     accessReportRead: z.boolean(),
     accessOverviewRead: z.boolean(),
     accessPointOfSalesRead: z.boolean(),
@@ -127,6 +128,7 @@ const createUserSchema = z.object({
 });
 
 const updateUserAccessSchema = z.object({
+    accessShowBuyPrice: z.boolean(),
     accessOverviewRead: z.boolean(),
     accessReportRead: z.boolean(),
     accessPointOfSalesRead: z.boolean(),
@@ -224,6 +226,7 @@ export default function UsersPage() {
             name: "",
             password: "",
             isActive: true,
+            accessShowBuyPrice: false,
             accessOverviewRead: false,
             accessPointOfSalesRead: false,
             accessPointOfSalesWrite: false,
@@ -266,6 +269,7 @@ export default function UsersPage() {
     const updateAccessForm = useForm<UpdateUserAccessFormValues>({
         resolver: zodResolver(updateUserAccessSchema),
         defaultValues: {
+            accessShowBuyPrice: false,
             accessOverviewRead: false,
             accessPointOfSalesRead: false,
             accessPointOfSalesWrite: false,
@@ -320,6 +324,7 @@ export default function UsersPage() {
                 name: "",
                 password: "",
                 isActive: true,
+                accessShowBuyPrice: false,
                 accessReportRead: false,
                 accessOverviewRead: false,
                 accessPointOfSalesRead: false,
@@ -375,6 +380,7 @@ export default function UsersPage() {
     const handleEditAccess = useCallback((user: User) => {
         setSelectedUser(user);
         updateAccessForm.reset({
+            accessShowBuyPrice: user.accessShowBuyPrice,
             accessOverviewRead: user.accessOverviewRead,
             accessReportRead: user.accessReportRead,
             accessPointOfSalesRead: user.accessPointOfSalesRead,

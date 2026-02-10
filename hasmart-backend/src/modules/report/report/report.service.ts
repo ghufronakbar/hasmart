@@ -17,6 +17,7 @@ import {
   ItemReportItem,
   MemberReportItem,
   MemberPurchaseReportItem,
+  OverallReportItem,
 } from "./report.interface";
 import { BranchQueryType } from "src/middleware/use-branch";
 
@@ -811,6 +812,246 @@ export class ReportService extends BaseService {
       return {
         buffer,
         fileName: `member-purchase-report-${new Date().getTime()}.xlsx`,
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      };
+    }
+  };
+
+  getOverallReport = async (
+    query: ReportQueryFilterType,
+    filter?: FilterQueryType,
+    branchQuery?: BranchQueryType,
+  ): Promise<ReportResult> => {
+    // 1. Build date filter
+    const dateFilter: Prisma.DateTimeFilter = {};
+    if (filter?.dateStart) dateFilter.gte = new Date(filter.dateStart);
+    if (filter?.dateEnd) dateFilter.lte = new Date(filter.dateEnd);
+    const hasDateFilter = filter?.dateStart || filter?.dateEnd;
+
+    // Helper: format date to YYYY-MM-DD string
+    const toDateKey = (d: Date): string => {
+      const dt = new Date(d);
+      return dt.toISOString().split("T")[0];
+    };
+
+    // 2. Get all active users (so columns always show even with 0)
+    const allUsers = await this.prisma.user.findMany({
+      where: { deletedAt: null, isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+
+    const allUserNames = allUsers.map((u) => u.name);
+
+    // 3. Fetch TransactionSales with items for profit calculation
+    const salesWhere: Prisma.TransactionSalesWhereInput = { deletedAt: null };
+    if (branchQuery?.branchId) salesWhere.branchId = branchQuery.branchId;
+    if (hasDateFilter) salesWhere.transactionDate = dateFilter;
+
+    const salesTransactions = await this.prisma.transactionSales.findMany({
+      where: salesWhere,
+      include: {
+        transactionSalesItems: {
+          include: {
+            masterItemVariant: { select: { amount: true } },
+          },
+        },
+      },
+    });
+
+    // 4. Fetch RecordAction for TRANSACTION_SALES CREATE to map salesId -> userId
+    const salesIds = salesTransactions.map((s) => s.id);
+    const recordActions = await this.prisma.recordAction.findMany({
+      where: {
+        modelType: "TRANSACTION_SALES",
+        actionType: "CREATE",
+        modelId: { in: salesIds },
+      },
+      select: { modelId: true, userId: true },
+    });
+
+    const salesUserMap = new Map<number, number>();
+    recordActions.forEach((ra) => {
+      salesUserMap.set(ra.modelId, ra.userId);
+    });
+
+    // User id -> name map
+    const userIdNameMap = new Map<number, string>();
+    allUsers.forEach((u) => userIdNameMap.set(u.id, u.name));
+
+    // 5. Fetch TransactionSell with items for profit calculation
+    const sellWhere: Prisma.TransactionSellWhereInput = { deletedAt: null };
+    if (branchQuery?.branchId) sellWhere.branchId = branchQuery.branchId;
+    if (hasDateFilter) sellWhere.transactionDate = dateFilter;
+
+    const sellTransactions = await this.prisma.transactionSell.findMany({
+      where: sellWhere,
+      include: {
+        transactionSellItems: {
+          include: {
+            masterItemVariant: { select: { amount: true } },
+          },
+        },
+      },
+    });
+
+    // 6. Fetch TransactionCashFlow
+    const cashFlowWhere: Prisma.TransactionCashFlowWhereInput = {
+      deletedAt: null,
+    };
+    if (branchQuery?.branchId) cashFlowWhere.branchId = branchQuery.branchId;
+    if (hasDateFilter) cashFlowWhere.transactionDate = dateFilter;
+
+    const cashFlows = await this.prisma.transactionCashFlow.findMany({
+      where: cashFlowWhere,
+    });
+
+    // 7. Aggregate data by date
+    type DayData = {
+      userRevenues: Map<string, number>; // userName -> amount
+      cashIn: number;
+      cashOut: number;
+      revenueCash: number;
+      revenueQris: number;
+      revenueDebit: number;
+      revenueSell: number;
+      totalGrossProfit: number;
+      totalBuyCost: number; // accumulated buy cost for net profit calculation
+    };
+
+    const dayMap = new Map<string, DayData>();
+
+    const getOrCreateDay = (dateKey: string): DayData => {
+      if (!dayMap.has(dateKey)) {
+        dayMap.set(dateKey, {
+          userRevenues: new Map(),
+          cashIn: 0,
+          cashOut: 0,
+          revenueCash: 0,
+          revenueQris: 0,
+          revenueDebit: 0,
+          revenueSell: 0,
+          totalGrossProfit: 0,
+          totalBuyCost: 0,
+        });
+      }
+      return dayMap.get(dateKey)!;
+    };
+
+    // Process Sales
+    salesTransactions.forEach((sale) => {
+      const dateKey = toDateKey(sale.transactionDate);
+      const day = getOrCreateDay(dateKey);
+      const saleAmount = Number(sale.recordedTotalAmount);
+
+      // Payment type breakdown
+      switch (sale.paymentType) {
+        case "CASH":
+          day.revenueCash += saleAmount;
+          break;
+        case "QRIS":
+          day.revenueQris += saleAmount;
+          break;
+        case "DEBIT":
+          day.revenueDebit += saleAmount;
+          break;
+      }
+
+      day.totalGrossProfit += saleAmount;
+
+      // Per-user revenue
+      const userId = salesUserMap.get(sale.id);
+      const userName = userId
+        ? userIdNameMap.get(userId) || "Unknown"
+        : "Unknown";
+      const current = day.userRevenues.get(userName) || 0;
+      day.userRevenues.set(userName, current + saleAmount);
+
+      // Buy cost for net profit
+      sale.transactionSalesItems.forEach((item) => {
+        const buyCostPerUnit =
+          Number(item.recordedBuyPrice) * item.masterItemVariant.amount;
+        const totalCost = buyCostPerUnit * item.qty;
+        day.totalBuyCost += totalCost;
+      });
+    });
+
+    // Process Sell (B2B)
+    sellTransactions.forEach((sell) => {
+      const dateKey = toDateKey(sell.transactionDate);
+      const day = getOrCreateDay(dateKey);
+      const sellAmount = Number(sell.recordedTotalAmount);
+
+      day.revenueSell += sellAmount;
+      day.totalGrossProfit += sellAmount;
+
+      // Buy cost for net profit
+      sell.transactionSellItems.forEach((item) => {
+        const buyCostPerUnit =
+          Number(item.recordedBuyPrice) * item.masterItemVariant.amount;
+        const totalCost = buyCostPerUnit * item.qty;
+        day.totalBuyCost += totalCost;
+      });
+    });
+
+    // Process CashFlow
+    cashFlows.forEach((cf) => {
+      const dateKey = toDateKey(cf.transactionDate);
+      const day = getOrCreateDay(dateKey);
+      const amount = Number(cf.amount);
+
+      if (cf.type === "IN") {
+        day.cashIn += amount;
+      } else {
+        day.cashOut += amount;
+      }
+    });
+
+    // 8. Build report items sorted by date ascending
+    const sortedDates = Array.from(dayMap.keys()).sort();
+
+    const reportData: OverallReportItem[] = sortedDates.map((dateKey) => {
+      const day = dayMap.get(dateKey)!;
+
+      // Ensure all users appear, even with 0
+      const userRevenues = allUserNames.map((userName) => ({
+        userName,
+        amount: day.userRevenues.get(userName) || 0,
+      }));
+
+      return {
+        date: dateKey,
+        userRevenues,
+        cashIn: day.cashIn,
+        cashOut: day.cashOut,
+        revenueCash: day.revenueCash,
+        revenueQris: day.revenueQris,
+        revenueDebit: day.revenueDebit,
+        revenueSell: day.revenueSell,
+        totalGrossProfit: day.totalGrossProfit,
+        totalNetProfit: day.totalGrossProfit - day.totalBuyCost,
+      };
+    });
+
+    if (query.exportAs === "pdf" || query.exportAs === "preview") {
+      const buffer = await this.pdfService.generateOverallReport(
+        reportData,
+        allUserNames,
+      );
+      return {
+        buffer,
+        fileName: `overall-report-${new Date().getTime()}.pdf`,
+        mimeType: "application/pdf",
+      };
+    } else {
+      const buffer = await this.xlsxService.generateOverallReport(
+        reportData,
+        allUserNames,
+      );
+      return {
+        buffer,
+        fileName: `overall-report-${new Date().getTime()}.xlsx`,
         mimeType:
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       };

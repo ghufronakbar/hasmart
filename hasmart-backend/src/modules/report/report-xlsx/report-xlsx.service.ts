@@ -11,6 +11,7 @@ import {
   ItemReportItem,
   MemberReportItem,
   MemberPurchaseReportItem,
+  OverallReportItem,
 } from "../report/report.interface";
 
 export class ReportXlsxService extends BaseService {
@@ -775,6 +776,80 @@ export class ReportXlsxService extends BaseService {
     worksheet.getColumn(5).width = 25;
     worksheet.getColumn(6).width = 10;
     worksheet.getColumn(7).width = 20;
+
+    // Write to buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+    return buffer as unknown as Buffer;
+  }
+
+  async generateOverallReport(
+    data: OverallReportItem[],
+    userNames: string[],
+  ): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Overall Report");
+
+    let currentRow = 1;
+
+    // Report Title
+    const titleRow = worksheet.getRow(currentRow++);
+    titleRow.getCell(1).value = "Laporan Keseluruhan";
+    titleRow.getCell(1).font = { bold: true, size: 14 };
+    currentRow++; // Gap
+
+    // Dynamic headers
+    const tableHeaderRow = worksheet.getRow(currentRow++);
+    let col = 1;
+    tableHeaderRow.getCell(col++).value = "Tanggal";
+    userNames.forEach((name) => {
+      tableHeaderRow.getCell(col++).value = `Pendapatan ${name}`;
+    });
+    tableHeaderRow.getCell(col++).value = "Kas Masuk";
+    tableHeaderRow.getCell(col++).value = "Kas Keluar";
+    tableHeaderRow.getCell(col++).value = "Pendapatan Tunai";
+    tableHeaderRow.getCell(col++).value = "Pendapatan QRIS";
+    tableHeaderRow.getCell(col++).value = "Pendapatan Debit";
+    tableHeaderRow.getCell(col++).value = "Pendapatan Penjualan";
+    tableHeaderRow.getCell(col++).value = "Total Laba Kotor";
+    tableHeaderRow.getCell(col++).value = "Total Laba Bersih";
+    tableHeaderRow.font = { bold: true };
+
+    // Data rows
+    data.forEach((item) => {
+      const row = worksheet.getRow(currentRow++);
+      let c = 1;
+      row.getCell(c++).value = item.date;
+
+      item.userRevenues.forEach((ur) => {
+        const cell = row.getCell(c++);
+        cell.value = ur.amount;
+        cell.numFmt = "#,##0.00";
+      });
+
+      const numCells = [
+        item.cashIn,
+        item.cashOut,
+        item.revenueCash,
+        item.revenueQris,
+        item.revenueDebit,
+        item.revenueSell,
+        item.totalGrossProfit,
+        item.totalNetProfit,
+      ];
+
+      numCells.forEach((val) => {
+        const cell = row.getCell(c++);
+        cell.value = val;
+        cell.numFmt = "#,##0.00";
+      });
+    });
+
+    // Adjust column widths
+    const totalCols = 1 + userNames.length + 8;
+    worksheet.getColumn(1).width = 15; // Tanggal
+    for (let i = 2; i <= totalCols; i++) {
+      worksheet.getColumn(i).width = 20;
+    }
 
     // Write to buffer
     const buffer = await workbook.xlsx.writeBuffer();

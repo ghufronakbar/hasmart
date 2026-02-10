@@ -143,4 +143,24 @@ export class ReportController extends BaseController {
     );
     res.send(result.buffer);
   };
+
+  getOverallReport = async (req: Request, res: Response) => {
+    const query = req.query as unknown as ReportQueryFilterType;
+    const filter = req.filterQuery;
+    const branchQuery = req.branchQuery;
+
+    const result = await this.service.getOverallReport(
+      query,
+      filter,
+      branchQuery,
+    );
+
+    res.setHeader("Content-Type", result.mimeType);
+    const disposition = query.exportAs === "preview" ? "inline" : "attachment";
+    res.setHeader(
+      "Content-Disposition",
+      `${disposition}; filename=${result.fileName}`,
+    );
+    res.send(result.buffer);
+  };
 }

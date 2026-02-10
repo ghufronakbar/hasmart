@@ -13,6 +13,7 @@ import {
   ItemReportItem,
   MemberReportItem,
   MemberPurchaseReportItem,
+  OverallReportItem,
 } from "../report/report.interface";
 import { ReportHelper } from "../report/report-helper";
 
@@ -1128,6 +1129,140 @@ export class ReportPdfService extends BaseService {
     const docDefinition: TDocumentDefinitions = {
       content: content,
       styles: ReportHelper.getStyles(),
+    };
+
+    const pdfDoc = await printer.createPdfKitDocument(docDefinition);
+
+    return new Promise((resolve, reject) => {
+      const chunks: Uint8Array[] = [];
+
+      pdfDoc.on("data", (chunk: Uint8Array) => chunks.push(chunk));
+      pdfDoc.on("end", () => resolve(Buffer.concat(chunks)));
+      pdfDoc.on("error", (err: Error) => reject(err));
+
+      pdfDoc.end();
+    });
+  }
+
+  async generateOverallReport(
+    data: OverallReportItem[],
+    userNames: string[],
+  ): Promise<Buffer> {
+    const fonts = ReportHelper.getFonts();
+    const printer = new PdfPrinter(fonts);
+
+    const content: any[] = [{ text: "Laporan Keseluruhan", style: "header" }];
+
+    // Dynamic headers: Tanggal + per-user columns + fixed columns
+    const headerRow: any[] = [
+      { text: "Tanggal", style: "tableHeader" },
+      ...userNames.map((name) => ({
+        text: `Pendapatan ${name}`,
+        style: "tableHeader",
+        alignment: "right" as const,
+      })),
+      { text: "Kas Masuk", style: "tableHeader", alignment: "right" as const },
+      { text: "Kas Keluar", style: "tableHeader", alignment: "right" as const },
+      {
+        text: "Pendapatan Tunai",
+        style: "tableHeader",
+        alignment: "right" as const,
+      },
+      {
+        text: "Pendapatan QRIS",
+        style: "tableHeader",
+        alignment: "right" as const,
+      },
+      {
+        text: "Pendapatan Debit",
+        style: "tableHeader",
+        alignment: "right" as const,
+      },
+      {
+        text: "Pendapatan Penjualan",
+        style: "tableHeader",
+        alignment: "right" as const,
+      },
+      {
+        text: "Total Laba Kotor",
+        style: "tableHeader",
+        alignment: "right" as const,
+      },
+      {
+        text: "Total Laba Bersih",
+        style: "tableHeader",
+        alignment: "right" as const,
+      },
+    ];
+
+    // Dynamic widths: date=auto, user cols=auto, fixed cols=auto
+    const widths = [
+      "auto",
+      ...userNames.map(() => "auto"),
+      "auto",
+      "auto",
+      "auto",
+      "auto",
+      "auto",
+      "auto",
+      "auto",
+      "auto",
+    ];
+
+    const bodyRows = data.map((item) => [
+      ReportHelper.formatDate(new Date(item.date)),
+      ...item.userRevenues.map((ur) => ({
+        text: ReportHelper.formatCurrency(ur.amount),
+        alignment: "right" as const,
+      })),
+      {
+        text: ReportHelper.formatCurrency(item.cashIn),
+        alignment: "right" as const,
+      },
+      {
+        text: ReportHelper.formatCurrency(item.cashOut),
+        alignment: "right" as const,
+      },
+      {
+        text: ReportHelper.formatCurrency(item.revenueCash),
+        alignment: "right" as const,
+      },
+      {
+        text: ReportHelper.formatCurrency(item.revenueQris),
+        alignment: "right" as const,
+      },
+      {
+        text: ReportHelper.formatCurrency(item.revenueDebit),
+        alignment: "right" as const,
+      },
+      {
+        text: ReportHelper.formatCurrency(item.revenueSell),
+        alignment: "right" as const,
+      },
+      {
+        text: ReportHelper.formatCurrency(item.totalGrossProfit),
+        alignment: "right" as const,
+      },
+      {
+        text: ReportHelper.formatCurrency(item.totalNetProfit),
+        alignment: "right" as const,
+      },
+    ]);
+
+    content.push({
+      style: "tableExample",
+      table: {
+        headerRows: 1,
+        widths,
+        body: [headerRow, ...bodyRows],
+      },
+    });
+
+    const docDefinition: TDocumentDefinitions = {
+      pageOrientation: "landscape",
+      content: content,
+      styles: ReportHelper.getStyles(),
+      defaultStyle: { fontSize: 8 },
     };
 
     const pdfDoc = await printer.createPdfKitDocument(docDefinition);

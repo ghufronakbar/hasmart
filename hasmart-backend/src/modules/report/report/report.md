@@ -100,3 +100,30 @@ Retrieves a list of items and their variants (Flat structure).
   ```http
   GET /report/item?exportAs=xlsx&accessToken=abc.123.xyz&branchId=1
   ```
+
+### 8. Overall Report (`Laporan Keseluruhan`)
+
+Retrieves aggregated daily report with per-user sales revenue, cashflow, payment-type breakdown, and profit.
+
+- **URL**: `GET /report/overall`
+- **Auth**: Required (Bearer Token or accessToken)
+- **Query Params**:
+  - `exportAs` (required): `pdf`, `xlsx`, or `preview`
+  - `dateStart` (optional): Start date filter
+  - `dateEnd` (optional): End date filter
+  - `branchId` (optional): Filter by branch
+- **Columns**:
+  - `Tanggal` — Date
+  - `Pendapatan {User}` — Per-user Sales revenue (dynamic, one column per user)
+  - `Kas Masuk` — CashFlow IN
+  - `Kas Keluar` — CashFlow OUT
+  - `Pendapatan Tunai` — Sales CASH
+  - `Pendapatan QRIS` — Sales QRIS
+  - `Pendapatan Debit` — Sales DEBIT
+  - `Pendapatan Penjualan` — Sell (B2B) revenue
+  - `Total Laba Kotor` — Gross profit (Cash + QRIS + Debit + Sell)
+  - `Total Laba Bersih` — Net profit (Gross - accumulated buy cost from items)
+- **Example Request**:
+  ```http
+  GET /report/overall?exportAs=preview&accessToken=abc.123.xyz&dateStart=2026-01-01&dateEnd=2026-01-31
+  ```

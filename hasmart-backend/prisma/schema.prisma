@@ -71,6 +71,7 @@ model User {
   refreshToken String? @unique @map("refresh_token") @db.Text()
 
   // access general
+  accessShowBuyPrice          Boolean @default(false) @map("access_show_buy_price")
   accessOverviewRead          Boolean @default(false) @map("access_overview_read")
   accessReportRead            Boolean @default(false) @map("access_report_read")
   accessPointOfSalesRead      Boolean @default(false) @map("access_point_of_sales_read")

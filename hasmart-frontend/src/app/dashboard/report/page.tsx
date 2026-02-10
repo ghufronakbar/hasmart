@@ -25,6 +25,12 @@ interface ReportConfig {
 
 const PERIOD_REPORTS: ReportConfig[] = [
     {
+        id: "overall",
+        title: "Laporan Keseluruhan",
+        description: "Rekap transaksi penjualan kasir (POS).",
+        endpoint: "/report/overall",
+    },
+    {
         id: "purchase",
         title: "Laporan Pembelian",
         description: "Rekap transaksi pembelian dari supplier.",

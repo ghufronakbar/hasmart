@@ -23,7 +23,7 @@ interface UserFormFieldsProps {
 // Group definitions for bulk actions
 const GROUPS = {
     overview: {
-        read: ["accessOverviewRead", "accessPointOfSalesRead", "accessReportRead", "accessPrintLabelRead", "accessFrontStockRead", "accessFrontStockHistoryRead"],
+        read: ["accessShowBuyPrice", "accessOverviewRead", "accessPointOfSalesRead", "accessReportRead", "accessPrintLabelRead", "accessFrontStockRead", "accessFrontStockHistoryRead"],
         write: ["accessPointOfSalesWrite", "accessFrontStockWrite"],
     },
     application: {
@@ -162,6 +162,7 @@ export function UserFormFields({ mode, form }: UserFormFieldsProps) {
                         writeFields={GROUPS.overview.write}
                     />
                     <div className="grid grid-cols-2 gap-4">
+                        <AccessCheckbox form={form} name="accessShowBuyPrice" label="Tampilkan Harga Beli" />
                         <AccessCheckbox form={form} name="accessOverviewRead" label="Lihat Ringkasan" />
                         <AccessCheckbox form={form} name="accessReportRead" label="Lihat Laporan" />
                         <AccessCheckbox form={form} name="accessPointOfSalesRead" label="Lihat POS" />

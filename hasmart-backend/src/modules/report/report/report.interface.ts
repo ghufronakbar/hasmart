@@ -183,3 +183,22 @@ export interface MemberPurchaseReportItem {
   totalPurchaseFrequency: number;
   totalPurchaseAmount: number;
 }
+
+// Laporan Keseluruhan
+export interface OverallReportUserRevenue {
+  userName: string;
+  amount: number;
+}
+
+export interface OverallReportItem {
+  date: string; // "YYYY-MM-DD"
+  userRevenues: OverallReportUserRevenue[]; // Semi-dynamic: per-user Sales revenue (0 if no transaction)
+  cashIn: number; // TransactionCashFlow type=IN
+  cashOut: number; // TransactionCashFlow type=OUT
+  revenueCash: number; // TransactionSales paymentType=CASH
+  revenueQris: number; // TransactionSales paymentType=QRIS
+  revenueDebit: number; // TransactionSales paymentType=DEBIT
+  revenueSell: number; // TransactionSell total
+  totalGrossProfit: number; // Cash + QRIS + Debit + Sell
+  totalNetProfit: number; // Gross - accumulated (recordedBuyPrice * variant.amount * qty) cost
+}

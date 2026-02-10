@@ -9,6 +9,7 @@ export interface User {
   updatedAt: string;
 
   // access
+  accessShowBuyPrice: boolean;
   accessOverviewRead: boolean;
   accessReportRead: boolean;
   accessPointOfSalesRead: boolean;
@@ -63,6 +64,7 @@ export interface CreateUserDTO {
   isActive: boolean;
 
   // access
+  accessShowBuyPrice?: boolean;
   accessOverviewRead?: boolean;
   accessReportRead?: boolean;
   accessPointOfSalesRead?: boolean;
@@ -107,6 +109,7 @@ export interface CreateUserDTO {
 }
 
 export interface UpdateUserAccessDTO {
+  accessShowBuyPrice: boolean;
   accessOverviewRead: boolean;
   accessReportRead: boolean;
   accessPointOfSalesRead: boolean;
