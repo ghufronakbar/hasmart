@@ -2,6 +2,7 @@ import path from "node:path";
 import * as XLSX from "xlsx";
 import axios from "axios";
 import * as dotenv from "dotenv";
+import { MasterItem, PrismaClient } from "@prisma/client";
 
 dotenv.config();
 
@@ -236,131 +237,141 @@ function readXlsAsItems(filePath: string): ItemSeed[] {
   return items;
 }
 
-// --- API ---
-const api = axios.create({
-  baseURL: BASE_URL,
-});
+const prisma = new PrismaClient();
 
-async function login(): Promise<string> {
-  try {
-    const res = await api.post<ApiResponse<UserLoginResponse>>(
-      "/app/user/login",
-      {
+async function login() {
+  const checkUser = await prisma.user.findFirst({
+    where: {
+      name: ADMIN_EMAIL,
+    },
+  });
+
+  if (!checkUser) {
+    await prisma.user.create({
+      data: {
+        isActive: true,
         name: ADMIN_EMAIL,
         password: ADMIN_PASSWORD,
+        isSuperUser: true,
       },
-    );
-    const token = res.data.data.accessToken;
-    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    console.log("Login successful.");
-    return token;
-  } catch (error: any) {
-    if (error.response) {
-      console.error(
-        "Login failed response:",
-        error.response.status,
-        error.response.data,
-      );
-    } else {
-      console.error("Login failed:", error.message);
-    }
-    throw new Error(
-      "Could not login. Ensure API is running and admin user exists.",
-    );
+    });
   }
 }
 
 async function getFirstBranch(): Promise<Branch> {
-  try {
-    const res = await api.get<ApiResponse<Branch[]>>("/app/branch?limit=1");
-    if (res.data.data && res.data.data.length > 0) {
-      return res.data.data[0];
-    }
+  const res = await prisma.branch.findFirst();
+  if (res) {
+    console.log("Branch already exists.");
+    return res;
+  } else {
     console.log("Creating default 'Pusat' branch...");
-    const createRes = await api.post<ApiResponse<Branch>>("/app/branch", {
-      code: "PUSAT",
-      name: "Hasmart Utama", // Matching original script name
-      address: "Jl Raya Sruwen-Karanggede KM.10 Susukan,Semarang",
-      phone: "081229706622",
+    const createRes = await prisma.branch.create({
+      data: {
+        code: "PUSAT",
+        name: "Hasmart Utama", // Matching original script name
+        address: "Jl Raya Sruwen-Karanggede KM.10 Susukan,Semarang",
+        phone: "081229706622",
+      },
     });
-    return createRes.data.data;
-  } catch (error: any) {
-    console.error("Failed to get/create branch:", error.message);
-    throw error;
+    return createRes;
   }
 }
 
 async function getAllSuppliers(): Promise<Supplier[]> {
-  try {
-    const res = await api.get<ApiResponse<Supplier[]>>(
-      "/master/supplier?limit=1000",
-    );
-    return res.data.data || [];
-  } catch {
-    return [];
-  }
+  const res = await prisma.masterSupplier.findMany();
+  return res;
 }
 
 async function createSupplier(code: string, name: string): Promise<Supplier> {
-  const res = await api.post<ApiResponse<Supplier>>("/master/supplier", {
-    code,
-    name,
+  const res = await prisma.masterSupplier.create({
+    data: {
+      code,
+      name,
+    },
   });
-  return res.data.data;
+  return res;
 }
 
 async function getAllUnits(): Promise<Unit[]> {
-  try {
-    const res = await api.get<ApiResponse<Unit[]>>("/master/unit?limit=1000");
-    return res.data.data || [];
-  } catch {
-    return [];
-  }
+  const res = await prisma.masterUnit.findMany();
+  return res;
 }
 
 async function createUnit(unitName: string): Promise<Unit> {
-  const res = await api.post<ApiResponse<Unit>>("/master/unit", {
-    unit: unitName,
-    name: unitName,
+  const res = await prisma.masterUnit.create({
+    data: {
+      unit: unitName,
+      name: unitName,
+    },
   });
-  return res.data.data;
+  return res;
 }
 
 async function getAllCategories(): Promise<ItemCategory[]> {
-  try {
-    const res = await api.get<ApiResponse<ItemCategory[]>>(
-      "/master/item-category?limit=1000",
-    );
-    return res.data.data || [];
-  } catch {
-    return [];
-  }
+  const res = await prisma.masterItemCategory.findMany();
+  return res;
 }
 
 async function createCategory(
   code: string,
   name: string,
 ): Promise<ItemCategory> {
-  const res = await api.post<ApiResponse<ItemCategory>>(
-    "/master/item-category",
-    { code, name },
-  );
-  return res.data.data;
+  const res = await prisma.masterItemCategory.create({
+    data: {
+      code,
+      name,
+    },
+  });
+  return res;
 }
 
-async function getItemByCode(code: string): Promise<Item | null> {
-  try {
-    const res = await api.get<ApiResponse<Item>>(`/master/item/code/${code}`);
-    return res.data.data;
-  } catch (error: any) {
-    if (error.response?.status === 404) return null;
-    throw error;
-  }
+async function getItemByCode(code: string): Promise<MasterItem | null> {
+  const res = await prisma.masterItem.findUnique({
+    where: {
+      code,
+    },
+  });
+  return res;
 }
 
-async function createItem(payload: any): Promise<Item> {
-  const res = await api.post<ApiResponse<Item>>("/master/item", payload);
-  return res.data.data;
+interface CreateItemPayload {
+  name: string;
+  code: string;
+  masterSupplierId: number;
+  masterItemCategoryId: number;
+  isActive: boolean;
+  masterItemVariants: {
+    unit: string;
+    amount: number;
+    sellPrice: number;
+  }[];
+}
+
+async function createItem(payload: CreateItemPayload): Promise<MasterItem> {
+  const res = await prisma.masterItem.create({
+    data: {
+      name: payload.name,
+      code: payload.code,
+      masterSupplierId: payload.masterSupplierId,
+      masterItemCategoryId: payload.masterItemCategoryId,
+      isActive: payload.isActive,
+      recordedBuyPrice: 0,
+      masterItemVariants: {
+        createMany: {
+          data: payload.masterItemVariants.map((variant) => ({
+            unit: variant.unit,
+            amount: variant.amount,
+            isBaseUnit: variant.amount === 1,
+            recordedBuyPrice: 0,
+            recordedProfitAmount: 0,
+            recordedProfitPercentage: 0,
+            sellPrice: variant.sellPrice,
+          })),
+        },
+      },
+    },
+  });
+  return res;
 }
 
 // --- Main Script ---
@@ -506,11 +517,11 @@ const seed = async () => {
         });
       }
 
-      const payload = {
+      const payload: CreateItemPayload = {
         name: item.namaItem,
         code: item.kodeItem,
-        masterSupplierCode: supplier.code,
-        masterItemCategoryCode: category.code,
+        masterSupplierId: supplier.id,
+        masterItemCategoryId: category.id,
         isActive: true,
         masterItemVariants: variants,
       };
