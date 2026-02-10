@@ -559,7 +559,12 @@ export class ItemService extends BaseService {
       await Promise.all(promises);
     });
 
-    await this.refreshBuyPriceService.refreshBuyPrice(id);
+    await this.refreshBuyPriceService.refreshBuyPrice(
+      id,
+      0,
+      data.buyPrice,
+      true,
+    );
 
     return this.getItemById(id);
   };
@@ -624,7 +629,7 @@ export class ItemService extends BaseService {
     // 3. Trigger Refresh Logic
     await Promise.all(
       uniqueItemIds.map((id) =>
-        this.refreshBuyPriceService.refreshBuyPrice(id),
+        this.refreshBuyPriceService.refreshBuyPrice(id, 0, sellPrice, true),
       ),
     );
 

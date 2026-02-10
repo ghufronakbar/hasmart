@@ -429,14 +429,22 @@ export class PurchaseService extends BaseService {
     const uniqueItemIds = [
       ...new Set(calculatedItems.map((i) => i.masterItemId)),
     ];
-    await Promise.all([
-      ...uniqueItemIds.map((itemId) =>
+
+    await Promise.all(
+      uniqueItemIds.map((itemId) =>
         this.refreshStockService.refreshRealStock(data.branchId, itemId),
       ),
-      ...uniqueItemIds.map((itemId) =>
-        this.refreshBuyPriceService.refreshBuyPrice(itemId),
-      ),
-    ]);
+    );
+
+    // update buy price
+    for (const item of purchase.transactionPurchaseItems) {
+      await this.refreshBuyPriceService.refreshBuyPrice(
+        item.masterItemId,
+        item.totalQty,
+        item.purchasePrice.div(item.recordedConversion),
+        false,
+      );
+    }
 
     return this.getPurchaseById(purchase.id);
   };
@@ -536,7 +544,11 @@ export class PurchaseService extends BaseService {
           },
         },
         include: {
-          transactionPurchaseItems: true,
+          transactionPurchaseItems: {
+            where: {
+              deletedAt: null,
+            },
+          },
         },
       });
 
@@ -573,33 +585,64 @@ export class PurchaseService extends BaseService {
       );
     }
 
-    // Refresh buy price for all affected items (old + new)
-    await Promise.all(
-      allItemIds.map((itemId) =>
-        this.refreshBuyPriceService.refreshBuyPrice(itemId),
-      ),
-    );
+    // 1. REVERT ITEM LAMA (Anggap sebagai Delete / Pengurangan)
+    // Gunakan data dari variable 'existing' yang diambil sebelum update DB
+    for (const item of existing.transactionPurchaseItems) {
+      // Hitung Qty Negatif
+      const negativeQty = item.totalQty * -1;
+
+      // Hitung Harga Base Unit Lama
+      const oldPricePerBase = item.purchasePrice.div(item.recordedConversion);
+
+      await this.refreshBuyPriceService.refreshBuyPrice(
+        item.masterItemId,
+        negativeQty,
+        oldPricePerBase,
+        false, // isOverride
+      );
+    }
+
+    // 2. APPLY ITEM BARU (Anggap sebagai Create / Penambahan)
+    // Gunakan data dari variable 'purchase' (hasil update DB)
+    for (const item of purchase.transactionPurchaseItems) {
+      // Hitung Harga Base Unit Baru
+      const newPricePerBase = item.purchasePrice.div(item.recordedConversion);
+
+      await this.refreshBuyPriceService.refreshBuyPrice(
+        item.masterItemId,
+        item.totalQty, // Qty Positif
+        newPricePerBase,
+        false, // isOverride
+      );
+    }
 
     return this.getPurchaseById(purchase.id);
   };
 
   deletePurchase = async (id: number, userId: number) => {
+    // 1. Ambil data SEBELUM dihapus (PENTING)
     const existing = await this.prisma.transactionPurchase.findFirst({
       where: { id, deletedAt: null },
       include: { transactionPurchaseItems: true },
     });
+
     if (!existing) {
       throw new NotFoundError();
     }
 
+    // 2. Soft Delete (Database Transaction)
     const deleted = await this.prisma.$transaction(async (tx) => {
-      // Soft delete the purchase
       const result = await tx.transactionPurchase.update({
         where: { id },
         data: { deletedAt: new Date() },
       });
 
-      // Record action
+      // Soft delete items juga (OPSIONAL tapi SANGAT DISARANKAN agar query stok bersih)
+      await tx.transactionPurchaseItem.updateMany({
+        where: { transactionPurchaseId: id },
+        data: { deletedAt: new Date() },
+      });
+
       await tx.recordAction.create({
         data: {
           modelType: RecordActionModelType.TRANSACTION_PURCHASE,
@@ -614,21 +657,41 @@ export class PurchaseService extends BaseService {
       return result;
     });
 
-    // Refresh stock for all items
-    const itemIds = existing.transactionPurchaseItems.map(
-      (i) => i.masterItemId,
-    );
-    const uniqueItemIds = [...new Set(itemIds)];
-    await Promise.all([
-      // refresh stock for all items
-      ...uniqueItemIds.map((itemId) =>
+    // 3. LOGIKA REFRESH (Stock & Price)
+
+    // A. Refresh Stock dulu (Agar stok fisik di DB berkurang/kembali)
+    const uniqueItemIds = [
+      ...new Set(existing.transactionPurchaseItems.map((i) => i.masterItemId)),
+    ];
+
+    await Promise.all(
+      uniqueItemIds.map((itemId) =>
         this.refreshStockService.refreshRealStock(existing.branchId, itemId),
       ),
-      // refresh buy price for all items
-      ...uniqueItemIds.map((itemId) =>
-        this.refreshBuyPriceService.refreshBuyPrice(itemId),
-      ),
-    ]);
+    );
+
+    // B. Refresh Buy Price (Reverse Calculation)
+    // Loop setiap item yang dihapus untuk mengembalikan harganya
+    for (const item of existing.transactionPurchaseItems) {
+      // 1. Hitung Qty Negatif (Base Unit)
+      // Contoh: Beli 10, sekarang di-delete berarti -10
+      const negativeQty = item.totalQty * -1;
+
+      // 2. Hitung Harga Base Unit (Saat beli dulu)
+      // Pakai Decimal dari Prisma langsung
+      // Rumus: PurchasePrice / Conversion
+      const oldPurchasePricePerBase = item.purchasePrice.div(
+        item.recordedConversion,
+      );
+
+      // 3. Panggil Service
+      await this.refreshBuyPriceService.refreshBuyPrice(
+        item.masterItemId,
+        negativeQty, // Parameter 1: Qty Negatif (-50)
+        oldPurchasePricePerBase, // Parameter 2: Harga (1000)
+        false,
+      );
+    }
 
     return deleted;
   };

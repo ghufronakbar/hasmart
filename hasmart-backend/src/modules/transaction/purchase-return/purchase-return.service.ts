@@ -14,6 +14,7 @@ import {
 } from ".prisma/client";
 import { BranchQueryType } from "src/middleware/use-branch";
 import { Decimal } from "@prisma/client/runtime/library";
+import { RefreshBuyPriceService } from "../refresh-buy-price/refresh-buy-price.service";
 
 interface CalculatedDiscount {
   percentage: Decimal;
@@ -38,6 +39,7 @@ export class PurchaseReturnService extends BaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly refreshStockService: RefreshStockService,
+    private readonly refreshBuyPriceService: RefreshBuyPriceService,
   ) {
     super();
   }
@@ -376,6 +378,16 @@ export class PurchaseReturnService extends BaseService {
       ),
     );
 
+    // update buy price
+    for (const item of purchaseReturn.transactionPurchaseReturnItems) {
+      await this.refreshBuyPriceService.refreshBuyPrice(
+        item.masterItemId,
+        -item.totalQty,
+        item.purchasePrice.div(item.recordedConversion),
+        false,
+      );
+    }
+
     return this.getPurchaseReturnById(purchaseReturn.id);
   };
 
@@ -467,7 +479,9 @@ export class PurchaseReturnService extends BaseService {
           },
         },
         include: {
-          transactionPurchaseReturnItems: true,
+          transactionPurchaseReturnItems: {
+            where: { deletedAt: null },
+          },
         },
       });
 
@@ -501,6 +515,34 @@ export class PurchaseReturnService extends BaseService {
         oldItemIds.map((itemId) =>
           this.refreshStockService.refreshRealStock(existing.branchId, itemId),
         ),
+      );
+    }
+
+    // 1. REVERT ITEM LAMA (Batalkan Retur Lama)
+    // Logika: Retur itu mengurangi (-), membatalkan retur berarti menambah (+)
+    // Gunakan variable 'existing' (data sebelum update)
+    for (const item of existing.transactionPurchaseReturnItems) {
+      const oldPricePerBase = item.purchasePrice.div(item.recordedConversion);
+
+      await this.refreshBuyPriceService.refreshBuyPrice(
+        item.masterItemId,
+        item.totalQty, // POSITIF (Mengembalikan bobot yang hilang)
+        oldPricePerBase,
+        false,
+      );
+    }
+
+    // 2. APPLY ITEM BARU (Terapkan Retur Baru)
+    // Logika: Retur mengurangi stok (-)
+    // Gunakan variable 'purchaseReturn' (data setelah update)
+    for (const item of purchaseReturn.transactionPurchaseReturnItems) {
+      const newPricePerBase = item.purchasePrice.div(item.recordedConversion);
+
+      await this.refreshBuyPriceService.refreshBuyPrice(
+        item.masterItemId,
+        -item.totalQty, // NEGATIF (Mengurangi bobot)
+        newPricePerBase,
+        false,
       );
     }
 
@@ -548,6 +590,16 @@ export class PurchaseReturnService extends BaseService {
         this.refreshStockService.refreshRealStock(existing.branchId, itemId),
       ),
     );
+
+    // update buy price
+    for (const item of existing.transactionPurchaseReturnItems) {
+      await this.refreshBuyPriceService.refreshBuyPrice(
+        item.masterItemId,
+        item.totalQty,
+        item.purchasePrice.div(item.recordedConversion),
+        false,
+      );
+    }
 
     return deleted;
   };
