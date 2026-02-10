@@ -682,6 +682,7 @@ export default function TransferPage() {
                                                 placeholder="Pilih Cabang Tujuan"
                                                 inputValue={searchBranch}
                                                 onInputChange={setSearchBranch}
+                                                filterString={searchBranch}
                                                 renderLabel={(b) => <span>{b.name}</span>}
                                                 className="w-full"
                                             />
@@ -756,6 +757,7 @@ export default function TransferPage() {
                                                                     placeholder="Pilih Barang"
                                                                     inputValue={searchItem}
                                                                     onInputChange={setSearchItem}
+                                                                    filterString={searchItem}
                                                                     renderLabel={(item) => <div className="flex flex-col"><span className="font-semibold">{item.name}</span></div>}
                                                                     className="w-full"
                                                                 />

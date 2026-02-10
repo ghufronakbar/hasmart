@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useForm, useFieldArray, Resolver, UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -57,6 +57,7 @@ import { DataTable } from "@/components/ui/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { DataTableToolbar } from "@/components/ui/data-table/data-table-toolbar";
 import { Combobox } from "@/components/custom/combobox";
+import { Item, ItemVariant } from "@/types/master/item";
 
 import { useAccessControl, UserAccess } from "@/hooks/use-access-control";
 import { useBranch } from "@/providers/branch-provider";
@@ -299,10 +300,36 @@ function CreateTransferDialog({ open, onOpenChange }: { open: boolean, onOpenCha
 function TransferItemRow({ index, form, onRemove }: { index: number, form: UseFormReturn<TransferFormValues>, onRemove: () => void }) {
     const [searchItem, setSearchItem] = useState("");
     const debouncedSearchItem = useDebounce(searchItem, 300);
+    const [cachedItems, setCachedItems] = useState<Item[]>([]);
     const { data: items } = useItems({ search: debouncedSearchItem, limit: 20 });
 
+    // Cache accumulation
+    useEffect(() => {
+        const fetchedItems = items?.data;
+        if (fetchedItems) {
+            setCachedItems(prev => {
+                const map = new Map(prev.map(i => [i.id, i]));
+                fetchedItems.forEach((item) => {
+                    if (!map.has(item.id)) map.set(item.id, item);
+                    else map.set(item.id, item);
+                });
+                return Array.from(map.values());
+            });
+        }
+    }, [items?.data]);
+
+    const itemOptions = useMemo(() => {
+        const listItems = items?.data || [];
+        const map = new Map();
+
+        cachedItems.forEach(i => map.set(i.id, i));
+        listItems.forEach(i => map.set(i.id, i));
+
+        return Array.from(map.values());
+    }, [cachedItems, items?.data]);
+
     const selectedItemId = form.watch(`items.${index}.masterItemId`); // Watch item selection
-    const selectedItem = useMemo(() => items?.data?.find(i => i.id === selectedItemId) || items?.data?.find(i => i.id === form.getValues(`items.${index}.masterItemId`)), [items, selectedItemId, form, index]);
+    const selectedItem = useMemo(() => itemOptions.find(i => i.id === selectedItemId), [itemOptions, selectedItemId]);
     const variants = selectedItem?.masterItemVariants || [];
 
     const handleItemSelect = (val: number) => {
@@ -322,10 +349,11 @@ function TransferItemRow({ index, form, onRemove }: { index: number, form: UseFo
                             <Combobox
                                 value={field.value}
                                 onChange={(val) => handleItemSelect(val)}
-                                options={items?.data || []}
+                                options={itemOptions}
                                 placeholder="Pilih Barang"
                                 inputValue={searchItem}
                                 onInputChange={setSearchItem}
+                                filterString={searchItem}
                                 renderLabel={(item) => <div className="flex flex-col"><span className="font-semibold">{item.name} - {item.code}</span></div>}
                             />
                             <FormMessage />
@@ -352,7 +380,7 @@ function TransferItemRow({ index, form, onRemove }: { index: number, form: UseFo
                                         </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                        {variants.map((v) => (
+                                        {variants.map((v: ItemVariant) => (
                                             <SelectItem key={v.id} value={v.id.toString()}>
                                                 {v.unit} ({v.amount})
                                             </SelectItem>

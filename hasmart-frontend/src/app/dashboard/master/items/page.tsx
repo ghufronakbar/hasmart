@@ -924,15 +924,13 @@ export default function ItemsPage() {
                                         </FormItem>
                                     )} />
 
-                                    {formMode === 'create' && (
-                                        <FormField control={unifiedForm.control} name="code" render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Kode Item</FormLabel>
-                                                <FormControl><Input placeholder="Contoh: IND001" {...field} /></FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )} />
-                                    )}
+                                    <FormField control={unifiedForm.control} name="code" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Kode Item</FormLabel>
+                                            <FormControl><Input placeholder="Contoh: IND001" {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )} />
 
                                     <FormField control={unifiedForm.control} name="masterItemCategoryCode" render={({ field }) => (
                                         <FormItem>
