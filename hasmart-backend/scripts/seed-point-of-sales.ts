@@ -457,6 +457,30 @@ const seed = async () => {
         },
       });
       createSale.transactionSalesItems.push(createSalesItem);
+
+      // catat stok baru
+      const createStock = await prisma.itemBranch.upsert({
+        where: {
+          masterItemId_branchId: {
+            masterItemId: masterItem.id,
+            branchId: branch.id,
+          },
+        },
+        update: {
+          recordedStock: {
+            decrement: item.kuantitas || 0,
+          },
+          recordedFrontStock: {
+            decrement: item.kuantitas || 0,
+          },
+        },
+        create: {
+          masterItemId: masterItem.id,
+          branchId: branch.id,
+          recordedStock: -(item.kuantitas || 0),
+          recordedFrontStock: -(item.kuantitas || 0),
+        },
+      });
     }
     // create record action
     await prisma.recordAction.create({

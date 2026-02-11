@@ -470,6 +470,15 @@ const seed = async () => {
         select: {
           totalQty: true,
           recordedSubTotalAmount: true,
+          masterItem: {
+            select: {
+              masterItemVariants: {
+                select: {
+                  recordedProfitPercentage: true,
+                },
+              },
+            },
+          },
         },
       });
 
@@ -484,25 +493,54 @@ const seed = async () => {
       const averagePurchasePrice = totalPurchasePrice.div(weight);
 
       // catat record buy price
-      await prisma.masterItem.update({
+      const updateMasterItem = await prisma.masterItem.update({
         where: {
           id: masterItem.id,
         },
         data: {
           recordedBuyPrice: averagePurchasePrice,
         },
+        include: {
+          masterItemVariants: true,
+        },
       });
 
-      await prisma.masterItemVariant.update({
+      // catat stok baru
+      const createStock = await prisma.itemBranch.upsert({
         where: {
-          id: masterItemVariant?.id,
+          masterItemId_branchId: {
+            masterItemId: masterItem.id,
+            branchId: branch.id,
+          },
         },
-        data: {
-          recordedBuyPrice: averagePurchasePrice.mul(
-            masterItemVariant?.amount || 1,
-          ),
+        update: {
+          recordedStock: {
+            increment: item.kuantitas || 0,
+          },
+        },
+        create: {
+          masterItemId: masterItem.id,
+          branchId: branch.id,
+          recordedStock: item.kuantitas || 0,
+          recordedFrontStock: 0,
         },
       });
+
+      for await (const variant of updateMasterItem.masterItemVariants) {
+        const buyprice = updateMasterItem.recordedBuyPrice.mul(variant.amount);
+        const profit = variant.sellPrice.sub(buyprice);
+        const percentage = profit.mul(100).div(buyprice);
+        const updateMasterItemVariant = await prisma.masterItemVariant.update({
+          where: {
+            id: variant.id,
+          },
+          data: {
+            recordedBuyPrice: averagePurchasePrice.mul(variant?.amount || 1),
+            recordedProfitPercentage: percentage,
+            recordedProfitAmount: profit,
+          },
+        });
+      }
     }
 
     // create record action
