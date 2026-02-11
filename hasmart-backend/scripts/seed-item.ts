@@ -14,7 +14,7 @@ import bcrypt from "bcryptjs";
 dotenv.config();
 
 // Configuration
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "ADMIN";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "12345678";
 
 // --- Excel Interface ---
@@ -188,7 +188,10 @@ const prisma = new PrismaClient();
 export async function login() {
   const checkUser = await prisma.user.findFirst({
     where: {
-      name: ADMIN_EMAIL,
+      name: {
+        equals: ADMIN_EMAIL,
+        mode: "insensitive",
+      },
     },
   });
 
