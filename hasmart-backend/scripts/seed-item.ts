@@ -1,75 +1,21 @@
 import path from "node:path";
 import * as XLSX from "xlsx";
-import axios from "axios";
 import * as dotenv from "dotenv";
-import { MasterItem, PrismaClient } from "@prisma/client";
+import {
+  Branch,
+  MasterItem,
+  MasterItemCategory,
+  MasterSupplier,
+  MasterUnit,
+  PrismaClient,
+} from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 dotenv.config();
 
 // Configuration
-const BASE_URL = "http://localhost:9999/api";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "12345678";
-
-// --- Types ---
-interface ApiResponse<T> {
-  data: T;
-  metaData: {
-    code: number;
-    status: string;
-    message: string;
-  };
-}
-
-interface UserLoginResponse {
-  accessToken: string;
-}
-
-interface Branch {
-  id: number;
-  name: string;
-  code: string;
-}
-
-interface Supplier {
-  id: number;
-  code: string;
-  name: string;
-}
-
-interface ItemCategory {
-  id: number;
-  code: string;
-  name: string;
-}
-
-interface Unit {
-  id: number;
-  unit: string;
-  name: string;
-}
-
-interface ItemVariant {
-  id: number;
-  unit: string;
-  amount: number;
-  sellPrice: number;
-  recordedBuyPrice: number;
-  isBaseUnit: boolean;
-}
-
-interface Item {
-  id: number;
-  code: string;
-  name: string;
-  masterSupplierId: number;
-  masterItemCategoryId: number;
-  recordedBuyPrice: number;
-  isActive: boolean;
-  masterItemVariants: ItemVariant[];
-  masterSupplier?: { code: string };
-  masterItemCategory?: { code: string };
-}
 
 // --- Excel Interface ---
 export interface ItemSeed {
@@ -239,7 +185,7 @@ function readXlsAsItems(filePath: string): ItemSeed[] {
 
 const prisma = new PrismaClient();
 
-async function login() {
+export async function login() {
   const checkUser = await prisma.user.findFirst({
     where: {
       name: ADMIN_EMAIL,
@@ -247,18 +193,22 @@ async function login() {
   });
 
   if (!checkUser) {
+    console.log("Creating admin user...");
+    const hashPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
     await prisma.user.create({
       data: {
         isActive: true,
         name: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
+        password: hashPassword,
         isSuperUser: true,
       },
     });
+  } else {
+    console.log("Admin user already exists.");
   }
 }
 
-async function getFirstBranch(): Promise<Branch> {
+export async function getFirstBranch(): Promise<Branch> {
   const res = await prisma.branch.findFirst();
   if (res) {
     console.log("Branch already exists.");
@@ -277,12 +227,15 @@ async function getFirstBranch(): Promise<Branch> {
   }
 }
 
-async function getAllSuppliers(): Promise<Supplier[]> {
+export async function getAllSuppliers(): Promise<MasterSupplier[]> {
   const res = await prisma.masterSupplier.findMany();
   return res;
 }
 
-async function createSupplier(code: string, name: string): Promise<Supplier> {
+export async function createSupplier(
+  code: string,
+  name: string,
+): Promise<MasterSupplier> {
   const res = await prisma.masterSupplier.create({
     data: {
       code,
@@ -292,12 +245,12 @@ async function createSupplier(code: string, name: string): Promise<Supplier> {
   return res;
 }
 
-async function getAllUnits(): Promise<Unit[]> {
+export async function getAllUnits(): Promise<MasterUnit[]> {
   const res = await prisma.masterUnit.findMany();
   return res;
 }
 
-async function createUnit(unitName: string): Promise<Unit> {
+export async function createUnit(unitName: string): Promise<MasterUnit> {
   const res = await prisma.masterUnit.create({
     data: {
       unit: unitName,
@@ -307,7 +260,7 @@ async function createUnit(unitName: string): Promise<Unit> {
   return res;
 }
 
-async function getAllCategories(): Promise<ItemCategory[]> {
+async function getAllCategories(): Promise<MasterItemCategory[]> {
   const res = await prisma.masterItemCategory.findMany();
   return res;
 }
@@ -315,7 +268,7 @@ async function getAllCategories(): Promise<ItemCategory[]> {
 async function createCategory(
   code: string,
   name: string,
-): Promise<ItemCategory> {
+): Promise<MasterItemCategory> {
   const res = await prisma.masterItemCategory.create({
     data: {
       code,
