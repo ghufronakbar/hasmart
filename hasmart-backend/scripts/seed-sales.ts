@@ -2,62 +2,10 @@ import path from "node:path";
 import * as XLSX from "xlsx";
 import axios from "axios";
 import * as dotenv from "dotenv";
+import { PrismaClient, SalesPaymentType } from "@prisma/client";
+import { getFirstBranch } from "./seed-item";
 
 dotenv.config();
-
-// Configuration
-const BASE_URL = "http://localhost:9999/api";
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "12345678";
-
-// --- Types ---
-interface ApiResponse<T> {
-  data: T;
-  metaData: {
-    code: number;
-    status: string;
-    message: string;
-  };
-}
-
-interface UserLoginResponse {
-  accessToken: string;
-}
-
-interface Branch {
-  id: number;
-  name: string;
-  code: string;
-}
-
-interface ItemVariant {
-  id: number;
-  unit: string;
-  amount: number;
-  sellPrice: number;
-}
-
-interface Item {
-  id: number;
-  code: string;
-  name: string;
-  masterItemVariants: ItemVariant[];
-}
-
-interface SalesItemPayload {
-  masterItemVariantId: number;
-  qty: number;
-  discounts?: { percentage: number }[];
-}
-
-interface SalesPayload {
-  branchId: number;
-  notes?: string;
-  memberCode?: string | null;
-  cashReceived: number;
-  items: SalesItemPayload[];
-  paymentType: "CASH" | "DEBIT" | "QRIS";
-}
 
 // --- Excel Interfaces ---
 export interface PenjualanDoc {
@@ -219,219 +167,73 @@ function readPenjualanXls(filePath: string): PenjualanDoc {
   return doc;
 }
 
-// --- API ---
-const api = axios.create({ baseURL: BASE_URL });
-
-async function login(): Promise<string> {
-  try {
-    const res = await api.post<ApiResponse<UserLoginResponse>>(
-      "/app/user/login",
-      {
-        name: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-      },
-    );
-    const token = res.data.data.accessToken;
-    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    console.log("Login successful.");
-    return token;
-  } catch (error: any) {
-    console.error("Login failed:", error.response?.data || error.message);
-    throw new Error("Could not login.");
-  }
-}
-
-async function getFirstBranch(): Promise<Branch> {
-  try {
-    const res = await api.get<ApiResponse<Branch[]>>("/app/branch?limit=1");
-    if (res.data.data && res.data.data.length > 0) {
-      return res.data.data[0];
-    }
-    // Create default if not exists (should already exist from seed-item)
-    const createRes = await api.post<ApiResponse<Branch>>("/app/branch", {
-      code: "PUSAT",
-      name: "Hasmart Utama",
-      address: "Jl Raya Sruwen-Karanggede KM.10 Susukan,Semarang",
-      phone: "081229706622",
-    });
-    return createRes.data.data;
-  } catch (error: any) {
-    console.error("Failed to get branch:", error.message);
-    throw error;
-  }
-}
-
-async function getAllItems(): Promise<Item[]> {
-  try {
-    // Determine total first or just fetch a large number
-    // We'll fetch a large number for now, or loop pages if needed.
-    // Assuming 1000 items from seed-item is enough, if > 1000 need pagination
-    const res = await api.get<ApiResponse<{ rows: Item[] }>>(
-      "/master/item?limit=2000",
-    ); // Assuming structure returned by filter middleware
-    // Note: getFirstBranch used ApiResponse<Branch[]> because branch controller uses sendList
-    // Item controller uses generic getAll which typically returns { rows: [], pagination: {} }
-    // Let's check item controller if possible, but safe guess based on other list endpoints is { rows }
-    // Actually seed-purchase using direct access for suppliers? No, seed-purchase uses /master/supplier returns array?
-    // Let's verify structure. `BaseController.sendList` sends plain array `data`.
-    // `ItemController.getAllItems` calls `this.service.getAllItems` which returns `{ rows, pagination }`.
-    // Then `sendList` wraps it? converting {rows, pagination} to just `rows`?
-    // Wait, `BaseController` usually takes `[rows, count]` or result object.
-    // Looking at `sales.controller.ts` -> `getAllSales` returns `{ rows, pagination }`.
-    // `BaseController.sendList` implementation: `res.json({ data: result })` or handles aggregation?
-    // Let's assume standard { rows } if pagination enabled.
-    // If I use `sendList` with `{rows, pagination}`, the `data` field might be that object.
-    // For safety, I'll allow flexible parsing.
-
-    const data: any = res.data.data;
-    if (Array.isArray(data)) return data;
-    if (data.rows && Array.isArray(data.rows)) return data.rows;
-    return [];
-  } catch (error: any) {
-    console.warn("Failed to fetch all items:", error.message);
-    return [];
-  }
-}
-
-async function createSales(payload: SalesPayload): Promise<any> {
-  const res = await api.post<ApiResponse<any>>("/transaction/sales", payload);
-  return res.data.data;
-}
+const prisma = new PrismaClient();
 
 // --- Main ---
 
 const xlsPath = path.resolve(process.cwd(), "scripts", "PENJUALAN.xls");
 
 const seed = async () => {
-  console.log("Starting Seed Sales (API Mode)...");
-
-  // 1. Auth
-  await login();
-
-  // 2. Parse Excel
-  console.log("Reading Excel...");
-  const doc = readPenjualanXls(xlsPath);
-  console.log(`Loaded transactions: ${doc.penjualan.length}`);
-
-  if (doc.penjualan.length === 0) return;
-
-  // 3. Master Data
-  const branch = await getFirstBranch();
-  console.log(`Using Branch: ${branch.name}`);
-
-  console.log("Fetching Master Items...");
-  const validItems = await getAllItems();
-  console.log(`Fetched ${validItems.length} items from API.`);
-
-  // Create Lookup Map: Code -> Item
-  const itemMap = new Map<string, Item>();
-  validItems.forEach((i) => {
-    itemMap.set(i.code, i);
-  });
-
-  // 4. Process Transactions
-  let successCount = 0;
-  let failCount = 0;
-
-  for (const entry of doc.penjualan) {
-    try {
-      // Calculation of expected total based on current prices (API Requirement)
-      let expectedTotal = 0;
-
-      if (entry.items.length === 0) {
-        console.warn(`Skipping ${entry.nomor}: No items.`);
-        continue;
-      }
-
-      // Map Items
-      const salesItems: SalesItemPayload[] = [];
-      for (const rawItem of entry.items) {
-        const item = itemMap.get(rawItem.kode);
-        if (!item) {
-          console.warn(
-            `Item not found: ${rawItem.kode} (${rawItem.nama}) in ${entry.nomor}`,
-          );
-          continue;
-        }
-
-        // Find variant by unit
-        const variant = item.masterItemVariants.find(
-          (v) => v.unit?.toLowerCase() === rawItem.sat?.toLowerCase(),
-        );
-
-        // Fallback: use first variant if unit matches nothing but only 1 variant exists
-        const targetVariant =
-          variant ||
-          (item.masterItemVariants.length === 1
-            ? item.masterItemVariants[0]
-            : null);
-
-        if (!targetVariant) {
-          console.warn(
-            `Variant not found for item ${item.code} unit ${rawItem.sat}`,
-          );
-          continue;
-        }
-
-        const qty = rawItem.kts || 1;
-
-        // Accumulate expected total
-        expectedTotal += Number(targetVariant.sellPrice) * qty;
-
-        // Discount logic?
-        // Excel has `diskon` (amount per item? or percent?).
-        // `sales.validator` expects `discounts: { percentage }[]`.
-        // If rawItem.diskon > 0, we need to calculate percentage relative to (hargaJual * qty) or simple price?
-        // `diskon` in excel is usually line discount? or unit discount?
-        // Let's assume it's unit discount amount for now, or total discount.
-        // It's safer to omit discounts if we can't be sure, to avoid validation errors,
-        // OR calculate: % = (diskon / (hargaJual * qty)) * 100.
-        // Given complexity, let's omit discounts for initial refactor unless crucial.
-
-        salesItems.push({
-          masterItemVariantId: targetVariant.id,
-          qty: qty,
-          discounts: [], // Skipping discounts for simplicity in V1
-        });
-      }
-
-      if (salesItems.length === 0) {
-        console.warn(`Skipping ${entry.nomor}: No valid items mapped.`);
-        continue;
-      }
-
-      // Use the calculated total to ensure "cashReceived >= total" check passes
-      // We add a tiny buffer or just use exact match?
-      // Exact match might fail due to floating point. Let's safe-guard?
-      // API uses Decimal, likely safe if we pass number.
-      // But just in case, let's use the calculated one.
-      // If Excel summary.total is available, we ignore it because API enforces current price.
-
-      const payload: SalesPayload = {
-        branchId: branch.id,
-        notes: `Original Invoice: ${entry.nomor}`,
-        cashReceived: expectedTotal,
-        paymentType: "CASH",
-        items: salesItems,
-      };
-
-      await createSales(payload);
-      console.log(
-        `Created Sales: ${entry.nomor} -> TS-Success (Total: ${expectedTotal})`,
-      );
-      successCount++;
-    } catch (e: any) {
-      failCount++;
-      console.error(
-        `Failed ${entry.nomor}:`,
-        e.response?.data?.errors || e.response?.data || e.message,
-      );
-    }
-  }
-
-  console.log(`\nSeed Sales Completed.`);
-  console.log(`Success: ${successCount}`);
-  console.log(`Failed: ${failCount}`);
+  // DEPRECATED
+  // console.log("Starting Seed Sales (API Mode)...");
+  // // 2. Parse Excel
+  // console.log("Reading Excel...");
+  // const doc = readPenjualanXls(xlsPath);
+  // console.log(`Loaded transactions: ${doc.penjualan.length}`);
+  // if (doc.penjualan.length === 0) return;
+  // // 3. Master Data
+  // const branch = await getFirstBranch();
+  // console.log(`Using Branch: ${branch.name}`);
+  // let successCount = 0;
+  // let failCount = 0;
+  // for (const entry of doc.penjualan) {
+  //   try {
+  //     const checkInvoice = await prisma.transactionSales.findFirst({
+  //       where: {
+  //         invoiceNumber: entry.nomor,
+  //       },
+  //     });
+  //     if (checkInvoice) {
+  //       console.log(`Sales: ${entry.nomor} already exists`);
+  //       continue;
+  //     }
+  //     const sales = await prisma.transactionSales.create({
+  //       data: {
+  //         branchId: branch.id,
+  //         notes: `Original Invoice: ${entry.nomor}`,
+  //         cashReceived: entry.summary?.total || 0,
+  //         paymentType: SalesPaymentType.CASH,
+  //         cashChange:0,
+  //         invoiceNumber:entry.nomor,
+  //         recordedDiscountAmount: entry.summary?.diskon || 0,
+  //         recordedSubTotalAmount: entry.summary?.subTotal || 0,
+  //         recordedTotalAmount: entry.summary?.total || 0,
+  //         transactionDate: new Date(),
+  //         // transactionDate: new Date(entry.)
+  //         // items: {
+  //         //   create: entry.items.map((item) => ({
+  //         //     masterItemVariantId: item.id,
+  //         //     qty: item.kts || 1,
+  //         //     discounts: [],
+  //         //   })),
+  //         // },
+  //       },
+  //     });
+  //     console.log(
+  //       `Created Sales: ${entry.nomor} -> TS-Success (Total: ${entry.summary?.total})`,
+  //     );
+  //     successCount++;
+  //   } catch (e: any) {
+  //     failCount++;
+  //     console.error(
+  //       `Failed ${entry.nomor}:`,
+  //       e.response?.data?.errors || e.response?.data || e.message,
+  //     );
+  //   }
+  // }
+  // console.log(`\nSeed Sales Completed.`);
+  // console.log(`Success: ${successCount}`);
+  // console.log(`Failed: ${failCount}`);
 };
 
 seed().catch((e) => {

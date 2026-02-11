@@ -12,6 +12,7 @@ import {
 } from "@prisma/client";
 import { getFirstBranch } from "./seed-item";
 import bcrypt from "bcryptjs";
+import { Decimal } from "@prisma/client/runtime/library";
 
 dotenv.config();
 
@@ -460,6 +461,48 @@ const seed = async () => {
         },
       });
       createPurchase.transactionPurchaseItems.push(createPurchaseItem);
+
+      // todo: refresh buy price
+      const purchases = await prisma.transactionPurchaseItem.findMany({
+        where: {
+          masterItemId: masterItem.id,
+        },
+        select: {
+          totalQty: true,
+          recordedSubTotalAmount: true,
+        },
+      });
+
+      const weight = purchases.reduce((acc, purchase) => {
+        return acc + purchase.totalQty;
+      }, 0);
+
+      const totalPurchasePrice = purchases.reduce((acc, purchase) => {
+        return purchase.recordedSubTotalAmount.add(acc);
+      }, new Decimal(0));
+
+      const averagePurchasePrice = totalPurchasePrice.div(weight);
+
+      // catat record buy price
+      await prisma.masterItem.update({
+        where: {
+          id: masterItem.id,
+        },
+        data: {
+          recordedBuyPrice: averagePurchasePrice,
+        },
+      });
+
+      await prisma.masterItemVariant.update({
+        where: {
+          id: masterItemVariant?.id,
+        },
+        data: {
+          recordedBuyPrice: averagePurchasePrice.mul(
+            masterItemVariant?.amount || 1,
+          ),
+        },
+      });
     }
 
     // create record action
