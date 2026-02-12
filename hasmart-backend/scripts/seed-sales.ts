@@ -4,6 +4,7 @@ import axios from "axios";
 import * as dotenv from "dotenv";
 import { PrismaClient, SalesPaymentType } from "@prisma/client";
 import { getFirstBranch } from "./seed-item";
+import { Decimal } from "@prisma/client/runtime/library";
 
 dotenv.config();
 
@@ -174,66 +175,83 @@ const prisma = new PrismaClient();
 const xlsPath = path.resolve(process.cwd(), "scripts", "PENJUALAN.xls");
 
 const seed = async () => {
-  // DEPRECATED
-  // console.log("Starting Seed Sales (API Mode)...");
-  // // 2. Parse Excel
-  // console.log("Reading Excel...");
-  // const doc = readPenjualanXls(xlsPath);
-  // console.log(`Loaded transactions: ${doc.penjualan.length}`);
-  // if (doc.penjualan.length === 0) return;
-  // // 3. Master Data
-  // const branch = await getFirstBranch();
-  // console.log(`Using Branch: ${branch.name}`);
-  // let successCount = 0;
-  // let failCount = 0;
-  // for (const entry of doc.penjualan) {
-  //   try {
-  //     const checkInvoice = await prisma.transactionSales.findFirst({
-  //       where: {
-  //         invoiceNumber: entry.nomor,
-  //       },
-  //     });
-  //     if (checkInvoice) {
-  //       console.log(`Sales: ${entry.nomor} already exists`);
-  //       continue;
-  //     }
-  //     const sales = await prisma.transactionSales.create({
-  //       data: {
-  //         branchId: branch.id,
-  //         notes: `Original Invoice: ${entry.nomor}`,
-  //         cashReceived: entry.summary?.total || 0,
-  //         paymentType: SalesPaymentType.CASH,
-  //         cashChange:0,
-  //         invoiceNumber:entry.nomor,
-  //         recordedDiscountAmount: entry.summary?.diskon || 0,
-  //         recordedSubTotalAmount: entry.summary?.subTotal || 0,
-  //         recordedTotalAmount: entry.summary?.total || 0,
-  //         transactionDate: new Date(),
-  //         // transactionDate: new Date(entry.)
-  //         // items: {
-  //         //   create: entry.items.map((item) => ({
-  //         //     masterItemVariantId: item.id,
-  //         //     qty: item.kts || 1,
-  //         //     discounts: [],
-  //         //   })),
-  //         // },
-  //       },
-  //     });
-  //     console.log(
-  //       `Created Sales: ${entry.nomor} -> TS-Success (Total: ${entry.summary?.total})`,
-  //     );
-  //     successCount++;
-  //   } catch (e: any) {
-  //     failCount++;
-  //     console.error(
-  //       `Failed ${entry.nomor}:`,
-  //       e.response?.data?.errors || e.response?.data || e.message,
-  //     );
-  //   }
-  // }
-  // console.log(`\nSeed Sales Completed.`);
-  // console.log(`Success: ${successCount}`);
-  // console.log(`Failed: ${failCount}`);
+  const doc = readPenjualanXls(xlsPath);
+  let dontExist = 0;
+  for await (const item of doc.penjualan) {
+    const check = await prisma.transactionSales.findFirst({
+      where: {
+        invoiceNumber: item.nomor,
+      },
+    });
+    if (check) {
+      console.log(`Sales: ${item.nomor} already exists`);
+      const update = await prisma.transactionSales.update({
+        where: {
+          id: check.id,
+        },
+        data: {
+          cashReceived: item.summary?.total || new Decimal(0),
+          cashChange: new Decimal(0),
+          recordedDiscountAmount: item.summary?.diskon || new Decimal(0),
+          recordedSubTotalAmount: item.summary?.subTotal || new Decimal(0),
+          recordedTotalAmount: item.summary?.total || new Decimal(0),
+        },
+      });
+      console.log(`Sales: ${item.nomor} updated`);
+
+      for await (const i of item.items) {
+        const checkItem = await prisma.transactionSalesItem.findFirst({
+          where: {
+            transactionSalesId: check.id,
+            masterItem: {
+              code: {
+                equals: i.kode,
+                mode: "insensitive",
+              },
+            },
+          },
+        });
+        if (checkItem) {
+          console.log(`Sales Item: ${i.kode} already exists`);
+          const checkVariant = await prisma.masterItemVariant.findFirst({
+            where: {
+              unit: {
+                equals: i.sat,
+                mode: "insensitive",
+              },
+              masterItemId: checkItem.masterItemId,
+            },
+          });
+          let totalQty = i.kts || 1;
+          if (checkVariant) {
+            totalQty = (i.kts || 1) * checkVariant.amount;
+          }
+          const update = await prisma.transactionSalesItem.update({
+            where: {
+              id: checkItem.id,
+            },
+            data: {
+              qty: i.kts || 1,
+              totalQty: totalQty,
+              recordedBuyPrice: i.hargaPokok || new Decimal(0),
+              salesPrice: i.hargaJual || new Decimal(0),
+            },
+          });
+          console.log(`Sales Item: ${i.kode} updated`);
+        } else {
+          console.log(`Sales Item: ${i.kode} not exists`);
+          continue;
+        }
+      }
+    } else {
+      console.log(`🟡 Sales: ${item.nomor} not exists`);
+      dontExist++;
+      continue;
+    }
+  }
+  console.log(`Total Sales: ${doc.penjualan.length}`);
+  console.log(`Total Sales Updated: ${doc.penjualan.length - dontExist}`);
+  console.log(`Total Sales Not Updated: ${dontExist}`);
 };
 
 seed().catch((e) => {
