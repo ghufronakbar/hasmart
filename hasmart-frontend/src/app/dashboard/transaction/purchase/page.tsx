@@ -29,6 +29,8 @@ import {
 } from "@tanstack/react-table";
 import { AxiosError } from "axios";
 
+import { cn } from "@/lib/utils";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -897,8 +899,13 @@ export default function PurchasePage() {
 
 
 
+                                                const isMissingCategory = selectedItem?.masterItemCategory?.name === "MISSING" || selectedItem?.masterItemCategory?.name === "Missing Category";
+
                                                 return (
-                                                    <div key={field.id} className="grid grid-cols-12 gap-4 items-start border p-4 rounded-lg bg-muted/10 relative">
+                                                    <div key={field.id} className={cn(
+                                                        "grid grid-cols-12 gap-4 items-start border p-4 rounded-lg relative transition-colors",
+                                                        isMissingCategory ? "bg-red-500/10 border-red-200" : "bg-muted/10"
+                                                    )}>
                                                         <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-red-500" onClick={() => remove(index)}>
                                                             <X className="h-4 w-4" />
                                                         </Button>

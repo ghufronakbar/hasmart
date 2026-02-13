@@ -382,6 +382,7 @@ const seed = async () => {
         recordedTaxPercentage: 0,
         branchId: branch.id,
         masterSupplierId: supplier.id,
+        notes: pembelian.summary?.keterangan || "",
       },
       include: {
         transactionPurchaseItems: true,
