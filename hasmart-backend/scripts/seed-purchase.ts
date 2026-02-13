@@ -515,13 +515,14 @@ const seed = async () => {
         },
         update: {
           recordedStock: {
-            increment: item.kuantitas || 0,
+            increment: (item.kuantitas || 0) * (masterItemVariant?.amount || 1),
           },
         },
         create: {
           masterItemId: masterItem.id,
           branchId: branch.id,
-          recordedStock: item.kuantitas || 0,
+          recordedStock:
+            (item.kuantitas || 0) * (masterItemVariant?.amount || 1),
           recordedFrontStock: 0,
         },
       });
