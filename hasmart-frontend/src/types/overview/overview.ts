@@ -7,6 +7,8 @@ export interface FinancialSummary {
   netSales: number;
   netPurchase: number;
   transactionCount: number;
+  grossProfit: number;
+  netProfit: number;
 }
 
 export type FinancialSummaryResponse = BaseResponse<FinancialSummary>;

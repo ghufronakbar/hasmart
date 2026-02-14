@@ -124,7 +124,7 @@ export default function OverviewPage() {
                 {/* Net Sales */}
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Omzet Bersih</CardTitle>
+                        <CardTitle className="text-sm font-medium">Laba Bersih</CardTitle>
                         <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -133,10 +133,10 @@ export default function OverviewPage() {
                         ) : (
                             <>
                                 <div className="text-2xl font-bold text-green-600">
-                                    {formatCurrency(summary?.netSales || 0)}
+                                    {formatCurrency(summary?.netProfit || 0)}
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    Gross: {formatCurrency(summary?.grossSales || 0)}
+                                    Gross: {formatCurrency(summary?.grossProfit || 0)}
                                 </p>
                             </>
                         )}

@@ -32,6 +32,7 @@ export const menuItems: MenuItem[] = [
         title: "Label Harga",
         href: "/dashboard/label-prepare",
         icon: <Receipt className="h-4 w-4" />,
+        access: UserAccess.accessPrintLabelRead,
     },
     {
         title: "Stok Depan",

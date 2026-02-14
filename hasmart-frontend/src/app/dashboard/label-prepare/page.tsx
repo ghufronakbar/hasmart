@@ -35,8 +35,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import { useItems } from "@/hooks/master/use-item";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useAccessControl, UserAccess } from "@/hooks/use-access-control";
 
 export default function LabelPreparePage() {
+    useAccessControl([UserAccess.accessPrintLabelRead], true);
     const router = useRouter();
 
     // --- State ---

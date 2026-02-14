@@ -9,6 +9,8 @@ interface FinancialSummary {
   netSales: number;
   netPurchase: number;
   transactionCount: number;
+  grossProfit: number;
+  netProfit: number;
 }
 
 interface SalesTrendItem {
@@ -88,10 +90,10 @@ export class OverviewService extends BaseService {
       ...branchFilter,
     };
 
-    // Parallel aggregate queries
+    // Parallel queries
     const [
-      salesSum,
-      sellSum,
+      salesTransactions,
+      sellTransactions,
       salesReturnSum,
       sellReturnSum,
       purchaseSum,
@@ -99,14 +101,30 @@ export class OverviewService extends BaseService {
       salesCount,
       sellCount,
     ] = await Promise.all([
-      // Gross Sales
-      this.prisma.transactionSales.aggregate({
-        _sum: { recordedTotalAmount: true },
+      // Gross Sales (Fetch items for COGS)
+      this.prisma.transactionSales.findMany({
         where: dateFilter,
+        select: {
+          recordedTotalAmount: true,
+          transactionSalesItems: {
+            select: {
+              qty: true,
+              recordedBuyPrice: true,
+            },
+          },
+        },
       }),
-      this.prisma.transactionSell.aggregate({
-        _sum: { recordedTotalAmount: true },
+      this.prisma.transactionSell.findMany({
         where: dateFilter,
+        select: {
+          recordedTotalAmount: true,
+          transactionSellItems: {
+            select: {
+              qty: true,
+              recordedBuyPrice: true,
+            },
+          },
+        },
       }),
       // Returns
       this.prisma.transactionSalesReturn.aggregate({
@@ -131,9 +149,31 @@ export class OverviewService extends BaseService {
       this.prisma.transactionSell.count({ where: dateFilter }),
     ]);
 
-    // Prisma aggregate returns Decimal; use Decimal methods then convert to number
-    const salesTotal = new Decimal(salesSum._sum.recordedTotalAmount || 0);
-    const sellTotal = new Decimal(sellSum._sum.recordedTotalAmount || 0);
+    // Calculate Sales & Sell Totals and Buy Cost (COGS)
+    let salesTotal = new Decimal(0);
+    let sellTotal = new Decimal(0);
+    let totalBuyCost = new Decimal(0);
+
+    // Process Sales
+    for (const sale of salesTransactions) {
+      salesTotal = salesTotal.add(new Decimal(sale.recordedTotalAmount));
+      for (const item of sale.transactionSalesItems) {
+        // COGS = Buy Price * Qty
+        const cost = new Decimal(item.recordedBuyPrice).mul(item.qty);
+        totalBuyCost = totalBuyCost.add(cost);
+      }
+    }
+
+    // Process Sell
+    for (const sell of sellTransactions) {
+      sellTotal = sellTotal.add(new Decimal(sell.recordedTotalAmount));
+      for (const item of sell.transactionSellItems) {
+        // COGS = Buy Price * Qty
+        const cost = new Decimal(item.recordedBuyPrice).mul(item.qty);
+        totalBuyCost = totalBuyCost.add(cost);
+      }
+    }
+
     const salesReturnTotal = new Decimal(
       salesReturnSum._sum.recordedTotalAmount || 0,
     );
@@ -153,12 +193,21 @@ export class OverviewService extends BaseService {
     const netPurchase = purchaseTotal.sub(purchaseReturnTotal);
     const transactionCount = salesCount + sellCount;
 
+    // Profit Calculation (Matching ReportService logic)
+    // Gross Profit (in context of Overall Report) = Revenue (Gross Sales)
+    // Net Profit (in context of Overall Report) = Revenue - COGS
+    // We already have grossSales.
+    const grossProfit = grossSales; // Based on ReportService naming finding
+    const netProfit = grossSales.sub(totalBuyCost);
+
     return {
       grossSales: grossSales.toNumber(),
       totalReturns: totalReturns.toNumber(),
       netSales: netSales.toNumber(),
       netPurchase: netPurchase.toNumber(),
       transactionCount,
+      grossProfit: grossProfit.toNumber(),
+      netProfit: netProfit.toNumber(),
     };
   };
 
