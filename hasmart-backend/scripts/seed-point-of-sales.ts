@@ -606,6 +606,8 @@ const seed = async () => {
           userId: user?.id!,
           payloadBefore: Prisma.DbNull,
           payloadAfter: createSale,
+          createdAt: createSale.transactionDate,
+          updatedAt: createSale.transactionDate,
         },
       });
 
@@ -766,6 +768,8 @@ const seed = async () => {
           userId: user?.id!,
           payloadBefore: Prisma.DbNull,
           payloadAfter: createSell,
+          createdAt: createSell.transactionDate,
+          updatedAt: createSell.transactionDate,
         },
       });
 

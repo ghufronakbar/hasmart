@@ -907,17 +907,19 @@ export class ReportService extends BaseService {
       where: cashFlowWhere,
     });
 
-    // 7. Aggregate data by date
+    // 7. Aggregate data by date (using Prisma.Decimal for money precision)
+    const D = (v?: number | string) => new Prisma.Decimal(v ?? 0);
+
     type DayData = {
-      userRevenues: Map<string, number>; // userName -> amount
-      cashIn: number;
-      cashOut: number;
-      revenueCash: number;
-      revenueQris: number;
-      revenueDebit: number;
-      revenueSell: number;
-      totalGrossProfit: number;
-      totalBuyCost: number; // accumulated buy cost for net profit calculation
+      userRevenues: Map<string, Prisma.Decimal>; // userName -> amount
+      cashIn: Prisma.Decimal;
+      cashOut: Prisma.Decimal;
+      revenueCash: Prisma.Decimal;
+      revenueQris: Prisma.Decimal;
+      revenueDebit: Prisma.Decimal;
+      revenueSell: Prisma.Decimal;
+      totalGrossProfit: Prisma.Decimal;
+      totalBuyCost: Prisma.Decimal; // accumulated buy cost for net profit calculation
     };
 
     const dayMap = new Map<string, DayData>();
@@ -926,54 +928,67 @@ export class ReportService extends BaseService {
       if (!dayMap.has(dateKey)) {
         dayMap.set(dateKey, {
           userRevenues: new Map(),
-          cashIn: 0,
-          cashOut: 0,
-          revenueCash: 0,
-          revenueQris: 0,
-          revenueDebit: 0,
-          revenueSell: 0,
-          totalGrossProfit: 0,
-          totalBuyCost: 0,
+          cashIn: D(),
+          cashOut: D(),
+          revenueCash: D(),
+          revenueQris: D(),
+          revenueDebit: D(),
+          revenueSell: D(),
+          totalGrossProfit: D(),
+          totalBuyCost: D(),
         });
       }
       return dayMap.get(dateKey)!;
     };
 
+    // console.log("============salesTransactions=============");
+    // for (const sale of salesTransactions) {
+    //   for (const item of sale.transactionSalesItems) {
+    //     if (item.recordedBuyPrice.gt(item.salesPrice)) {
+    //       console.log(item.id, "NOT OK");
+    //       console.log("DEBUG ", item.recordedBuyPrice, item.salesPrice);
+    //       console.log("total", item.recordedTotalAmount);
+    //     } else {
+    //       console.log(item.id, "OK");
+    //     }
+    //   }
+    // }
+    // console.log("============salesTransactions=============");
+
     // Process Sales
     salesTransactions.forEach((sale) => {
       const dateKey = toDateKey(sale.transactionDate);
       const day = getOrCreateDay(dateKey);
-      const saleAmount = Number(sale.recordedTotalAmount);
+      const saleAmount = new Prisma.Decimal(sale.recordedTotalAmount);
 
       // Payment type breakdown
       switch (sale.paymentType) {
         case "CASH":
-          day.revenueCash += saleAmount;
+          day.revenueCash = day.revenueCash.add(saleAmount);
           break;
         case "QRIS":
-          day.revenueQris += saleAmount;
+          day.revenueQris = day.revenueQris.add(saleAmount);
           break;
         case "DEBIT":
-          day.revenueDebit += saleAmount;
+          day.revenueDebit = day.revenueDebit.add(saleAmount);
           break;
       }
 
-      day.totalGrossProfit += saleAmount;
+      day.totalGrossProfit = day.totalGrossProfit.add(saleAmount);
 
       // Per-user revenue
       const userId = salesUserMap.get(sale.id);
       const userName = userId
         ? userIdNameMap.get(userId) || "Unknown"
         : "Unknown";
-      const current = day.userRevenues.get(userName) || 0;
-      day.userRevenues.set(userName, current + saleAmount);
+      const current = day.userRevenues.get(userName) || D();
+      day.userRevenues.set(userName, current.add(saleAmount));
 
       // Buy cost for net profit
       sale.transactionSalesItems.forEach((item) => {
-        const buyCostPerUnit =
-          Number(item.recordedBuyPrice) * item.masterItemVariant.amount;
-        const totalCost = buyCostPerUnit * item.qty;
-        day.totalBuyCost += totalCost;
+        const buyCostPerUnit = item.recordedBuyPrice;
+        const totalCost = buyCostPerUnit.mul(item.qty);
+        day.totalBuyCost = day.totalBuyCost.add(totalCost);
       });
     });
 
@@ -981,30 +996,43 @@ export class ReportService extends BaseService {
     sellTransactions.forEach((sell) => {
       const dateKey = toDateKey(sell.transactionDate);
       const day = getOrCreateDay(dateKey);
-      const sellAmount = Number(sell.recordedTotalAmount);
+      const sellAmount = new Prisma.Decimal(sell.recordedTotalAmount);
 
-      day.revenueSell += sellAmount;
-      day.totalGrossProfit += sellAmount;
+      day.revenueSell = day.revenueSell.add(sellAmount);
+      day.totalGrossProfit = day.totalGrossProfit.add(sellAmount);
 
       // Buy cost for net profit
       sell.transactionSellItems.forEach((item) => {
-        const buyCostPerUnit =
-          Number(item.recordedBuyPrice) * item.masterItemVariant.amount;
-        const totalCost = buyCostPerUnit * item.qty;
-        day.totalBuyCost += totalCost;
+        const buyCostPerUnit = item.recordedBuyPrice;
+        const totalCost = buyCostPerUnit.mul(item.qty);
+        day.totalBuyCost = day.totalBuyCost.add(totalCost);
       });
     });
+
+    // console.log("============sellTransactions=============");
+    // for (const sell of sellTransactions) {
+    //   for (const item of sell.transactionSellItems) {
+    //     if (item.recordedBuyPrice.gt(item.sellPrice)) {
+    //       console.log(item.id, "NOT OK");
+    //       console.log("DEBUG ", item.recordedBuyPrice, item.sellPrice);
+    //       console.log("total", item.recordedTotalAmount);
+    //     } else {
+    //       console.log(item.id, "OK");
+    //     }
+    //   }
+    // }
+    // console.log("============salesTransactions=============");
 
     // Process CashFlow
     cashFlows.forEach((cf) => {
       const dateKey = toDateKey(cf.transactionDate);
       const day = getOrCreateDay(dateKey);
-      const amount = Number(cf.amount);
+      const amount = new Prisma.Decimal(cf.amount);
 
       if (cf.type === "IN") {
-        day.cashIn += amount;
+        day.cashIn = day.cashIn.add(amount);
       } else {
-        day.cashOut += amount;
+        day.cashOut = day.cashOut.add(amount);
       }
     });
 
@@ -1017,20 +1045,20 @@ export class ReportService extends BaseService {
       // Ensure all users appear, even with 0
       const userRevenues = allUserNames.map((userName) => ({
         userName,
-        amount: day.userRevenues.get(userName) || 0,
+        amount: Number(day.userRevenues.get(userName) || D()),
       }));
 
       return {
         date: dateKey,
         userRevenues,
-        cashIn: day.cashIn,
-        cashOut: day.cashOut,
-        revenueCash: day.revenueCash,
-        revenueQris: day.revenueQris,
-        revenueDebit: day.revenueDebit,
-        revenueSell: day.revenueSell,
-        totalGrossProfit: day.totalGrossProfit,
-        totalNetProfit: day.totalGrossProfit - day.totalBuyCost,
+        cashIn: Number(day.cashIn),
+        cashOut: Number(day.cashOut),
+        revenueCash: Number(day.revenueCash),
+        revenueQris: Number(day.revenueQris),
+        revenueDebit: Number(day.revenueDebit),
+        revenueSell: Number(day.revenueSell),
+        totalGrossProfit: Number(day.totalGrossProfit),
+        totalNetProfit: Number(day.totalGrossProfit.minus(day.totalBuyCost)),
       };
     });
 

@@ -554,6 +554,8 @@ const seed = async () => {
         userId: user.id,
         payloadBefore: Prisma.DbNull,
         payloadAfter: createPurchase,
+        createdAt: createPurchase.transactionDate,
+        updatedAt: createPurchase.transactionDate,
       },
     });
 

@@ -339,6 +339,8 @@ export class ReceiptService extends BaseService {
       QRIS: new Decimal(0),
     };
 
+    console.log("salesTransactions", salesTransactions);
+
     salesTransactions.forEach((t) => {
       totalTransaction++;
       const amount = t.recordedTotalAmount;
