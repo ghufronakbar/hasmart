@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { getFirstBranch } from "./seed-item";
 import {
   MasterItemCategory,
+  MasterMember,
   MasterSupplier,
   Prisma,
   PrismaClient,
@@ -315,18 +316,12 @@ const seed = async () => {
   const missingCategory = await getMissingCategory();
   const missingSupplier = await getMissingSupplier();
 
+  let equals = 0;
+  let notEquals = 0;
+  let totalMbg = 0;
+
   for await (const sale of posJson.sales) {
-    const check = await prisma.transactionSales.findUnique({
-      where: {
-        invoiceNumber: sale.header.nomor || `Missing Invoice ${Date.now()}`,
-      },
-    });
-
-    if (check) {
-      console.log(`Skipping sale with invoice number ${sale.header.nomor}`);
-      continue;
-    }
-
+    // KASIR
     let user: User | null = null;
 
     if (!sale.header.kasir) {
@@ -361,141 +356,426 @@ const seed = async () => {
       }
     }
 
-    const createSale = await prisma.transactionSales.create({
-      data: {
-        branchId: branch.id,
-        cashChange: 0,
-        cashReceived: sale.summary?.total || 0,
-        invoiceNumber: sale.header.nomor || `Missing Invoice ${Date.now()}`,
-        paymentType: SalesPaymentType.CASH,
-        recordedDiscountAmount: sale.summary?.diskon || 0,
-        recordedSubTotalAmount: sale.summary?.subTotal || 0,
-        recordedTotalAmount: sale.summary?.total || 0,
-        transactionDate: new Date(sale.header.tanggal || new Date()),
-        createdAt: new Date(sale.header.tanggal || new Date()),
-        updatedAt: new Date(sale.header.tanggal || new Date()),
-      },
-      include: {
-        transactionSalesItems: true,
-      },
-    });
+    // CHECK EQUALS
 
-    for await (const item of sale.items) {
-      let masterItem = await prisma.masterItem.findFirst({
+    const totalSales = new Decimal(sale.summary?.total || 0);
+    const totalSubTotal = new Decimal(sale.summary?.subTotal || 0);
+    const totalTotal = new Decimal(sale.summary?.total || 0);
+    const totalDiskon = new Decimal(sale.summary?.diskon || 0);
+
+    let totalEveryItem = new Decimal(0);
+    for (const item of sale.items) {
+      totalEveryItem = totalEveryItem.add(new Decimal(item.jumlah || 0));
+    }
+
+    const isEquals = totalSales.equals(totalEveryItem);
+
+    console.log("=================");
+    console.log("sale", sale.header.nomor, "isEquals", isEquals);
+    console.log("total sales", totalSales);
+    console.log("total sub total", totalSubTotal);
+    console.log("total total", totalTotal);
+    console.log("total diskon", totalDiskon);
+    console.log("total every item", totalEveryItem);
+    console.log("=================");
+
+    if (isEquals) {
+      equals++;
+    } else {
+      notEquals++;
+    }
+
+    // MEMBER
+    let member: MasterMember | null = null;
+
+    if (sale.header.pelanggan) {
+      // cek kategori & member
+      const checkMemCat = await prisma.masterMemberCategory.findFirst({
         where: {
-          code: item.kode.toUpperCase(),
+          code: sale.header.pelanggan.toUpperCase(),
         },
         include: {
-          masterItemVariants: true,
+          masterMembers: {
+            where: {
+              code: sale.header.pelanggan.toUpperCase(),
+            },
+            take: 1,
+          },
         },
       });
-      if (!masterItem) {
-        console.log("🟡 Creating new item:", item.nama, item.kode);
-        masterItem = await prisma.masterItem.create({
-          data: {
-            name: item.nama,
+
+      // jika ada assign
+      if (checkMemCat && checkMemCat.masterMembers.length > 0) {
+        member = checkMemCat.masterMembers[0];
+      } else {
+        // jika tidak ada buat
+        if (!checkMemCat) {
+          // jika tidak ada dari level category
+          const createCatMem = await prisma.masterMemberCategory.create({
+            data: {
+              code: sale.header.pelanggan.toUpperCase(),
+              name: sale.header.pelanggan.toUpperCase(),
+              color: "FF0000",
+              masterMembers: {
+                create: {
+                  code: sale.header.pelanggan.toUpperCase(),
+                  name: sale.header.pelanggan.toUpperCase(),
+                },
+              },
+            },
+            include: {
+              masterMembers: {
+                where: {
+                  code: sale.header.pelanggan.toUpperCase(),
+                },
+                take: 1,
+              },
+            },
+          });
+          member = createCatMem.masterMembers[0];
+        }
+
+        // jika cat ada tetapi tidak ada master member
+        if (checkMemCat && checkMemCat.masterMembers.length === 0) {
+          const createMember = await prisma.masterMember.create({
+            data: {
+              code: sale.header.pelanggan.toUpperCase(),
+              name: sale.header.pelanggan.toUpperCase(),
+              masterMemberCategoryId: checkMemCat.id,
+            },
+          });
+          member = createMember;
+        }
+      }
+    }
+
+    // CHECK MBG
+    const MBG_KEYWORDS = ["MBG", "MAKANAN BERGIZI GRATIS"];
+    const isMBG = MBG_KEYWORDS.some((keyword) =>
+      sale.header.pelanggan?.includes(keyword),
+    );
+
+    if (!isMBG) {
+      const check = await prisma.transactionSales.findUnique({
+        where: {
+          invoiceNumber: sale.header.nomor || `Missing Invoice ${Date.now()}`,
+        },
+      });
+
+      if (check) {
+        console.log(`Skipping sale with invoice number ${sale.header.nomor}`);
+        continue;
+      }
+
+      const createSale = await prisma.transactionSales.create({
+        data: {
+          branchId: branch.id,
+          cashChange: 0,
+          cashReceived: totalTotal,
+          invoiceNumber: sale.header.nomor || `Missing Invoice ${Date.now()}`,
+          paymentType: SalesPaymentType.CASH,
+          recordedDiscountAmount: totalDiskon,
+          recordedSubTotalAmount: totalSubTotal,
+          recordedTotalAmount: totalTotal,
+          transactionDate: new Date(sale.header.tanggal || new Date()),
+          createdAt: new Date(sale.header.tanggal || new Date()),
+          updatedAt: new Date(sale.header.tanggal || new Date()),
+          masterMemberId: null,
+        },
+        include: {
+          transactionSalesItems: true,
+        },
+      });
+
+      for await (const item of sale.items) {
+        let masterItem = await prisma.masterItem.findFirst({
+          where: {
             code: item.kode.toUpperCase(),
-            isActive: true,
-            recordedBuyPrice: 0,
-            masterItemCategoryId: missingCategory.id,
-            masterSupplierId: missingSupplier.id, // asumsikan supplier missing / karena tidak ada di seed:item
           },
           include: {
             masterItemVariants: true,
           },
         });
-      }
+        if (!masterItem) {
+          console.log("🟡 Creating new item:", item.nama, item.kode);
+          masterItem = await prisma.masterItem.create({
+            data: {
+              name: item.nama,
+              code: item.kode.toUpperCase(),
+              isActive: true,
+              recordedBuyPrice: 0,
+              masterItemCategoryId: missingCategory.id,
+              masterSupplierId: missingSupplier.id, // asumsikan supplier missing / karena tidak ada di seed:item
+            },
+            include: {
+              masterItemVariants: true,
+            },
+          });
+        }
 
-      const isVariantExist = masterItem.masterItemVariants.find(
-        (variant) => variant.unit?.toUpperCase() === item.sat?.toUpperCase(),
-      );
-
-      if (!isVariantExist) {
-        console.log(
-          "🟡 Creating new variant for item:",
-          masterItem.name,
-          item.sat,
+        const isVariantExist = masterItem?.masterItemVariants.find(
+          (variant) => variant.unit?.toUpperCase() === item.sat?.toUpperCase(),
         );
-        const createVariant = await prisma.masterItemVariant.create({
+
+        if (!isVariantExist) {
+          console.log(
+            "🟡 Creating new variant for item:",
+            masterItem.name,
+            item.sat,
+          );
+          const createVariant = await prisma.masterItemVariant.create({
+            data: {
+              // karena tidak ada data mengenai konversi, maka diasumsikan 1
+              unit: item.sat?.toUpperCase(),
+              amount: 1,
+              masterItemId: masterItem.id,
+              isBaseUnit: true,
+              // tidak ada data mengenai harga beli, maka diasumsikan 0
+              recordedBuyPrice: 0,
+              recordedProfitAmount: 0,
+              sellPrice: 0,
+              recordedProfitPercentage: 0,
+            },
+          });
+          masterItem.masterItemVariants.push(createVariant);
+        }
+
+        const masterItemVariant = masterItem.masterItemVariants.find(
+          (variant) => variant.unit?.toUpperCase() === item.sat?.toUpperCase(),
+        );
+
+        const createSalesItem = await prisma.transactionSalesItem.create({
           data: {
-            // karena tidak ada data mengenai konversi, maka diasumsikan 1
-            unit: item.sat?.toUpperCase(),
-            amount: 1,
+            transactionSalesId: createSale.id,
             masterItemId: masterItem.id,
-            isBaseUnit: true,
-            // tidak ada data mengenai harga beli, maka diasumsikan 0
-            recordedBuyPrice: 0,
-            recordedProfitAmount: 0,
-            sellPrice: 0,
-            recordedProfitPercentage: 0,
+            qty: item.kuantitas || 0,
+            recordedBuyPrice: new Decimal(
+              masterItem.recordedBuyPrice.mul(masterItemVariant?.amount || 1),
+            ),
+            salesPrice: new Decimal(item.harga || 0),
+            recordedDiscountAmount: new Decimal(item.diskon || 0),
+            //   pada data total adn sub total sama (karena tidak ada pajak dan diskon)
+            recordedTotalAmount: new Decimal(item.jumlah || 0),
+            recordedSubTotalAmount: new Decimal(item.jumlah || 0),
+            masterItemVariantId: masterItemVariant?.id!,
+            // jika tidak ada data mengenai konversi, maka diasumsikan 1
+            recordedConversion: masterItemVariant?.amount || 1,
+            totalQty: (item.kuantitas || 1) * (masterItemVariant?.amount || 1),
           },
         });
-        masterItem.masterItemVariants.push(createVariant);
-      }
+        createSale.transactionSalesItems.push(createSalesItem);
 
-      const masterItemVariant = masterItem.masterItemVariants.find(
-        (variant) => variant.unit?.toUpperCase() === item.sat?.toUpperCase(),
-      );
-
-      const createSalesItem = await prisma.transactionSalesItem.create({
-        data: {
-          transactionSalesId: createSale.id,
-          masterItemId: masterItem.id,
-          qty: item.kuantitas || 0,
-          recordedBuyPrice: new Decimal(
-            masterItem.recordedBuyPrice.mul(masterItemVariant?.amount || 1),
-          ),
-          salesPrice: new Decimal(item.harga || 0),
-          recordedDiscountAmount: new Decimal(item.diskon || 0),
-          //   pada data total adn sub total sama (karena tidak ada pajak dan diskon)
-          recordedTotalAmount: new Decimal(item.jumlah || 0),
-          recordedSubTotalAmount: new Decimal(item.jumlah || 0),
-          masterItemVariantId: masterItemVariant?.id!,
-          // karena tidak ada data mengenai konversi, maka diasumsikan 1
-          recordedConversion: masterItemVariant?.amount || 1,
-          totalQty: (item.kuantitas || 1) * (masterItemVariant?.amount || 1),
-        },
-      });
-      createSale.transactionSalesItems.push(createSalesItem);
-
-      // catat stok baru
-      const createStock = await prisma.itemBranch.upsert({
-        where: {
-          masterItemId_branchId: {
+        // catat stok baru
+        const createStock = await prisma.itemBranch.upsert({
+          where: {
+            masterItemId_branchId: {
+              masterItemId: masterItem.id,
+              branchId: branch.id,
+            },
+          },
+          update: {
+            // jika ada decrement dari kuantity * amount (konversi)
+            recordedStock: {
+              decrement:
+                (item.kuantitas || 1) * (masterItemVariant?.amount || 1),
+            },
+            recordedFrontStock: {
+              decrement:
+                (item.kuantitas || 1) * (masterItemVariant?.amount || 1),
+            },
+          },
+          create: {
             masterItemId: masterItem.id,
             branchId: branch.id,
+            // jika tidak ada buat dari kuanity * amount (konversi)
+            recordedStock: -(
+              (item.kuantitas || 1) * (masterItemVariant?.amount || 1)
+            ),
+            recordedFrontStock: -(
+              (item.kuantitas || 1) * (masterItemVariant?.amount || 1)
+            ),
           },
-        },
-        update: {
-          recordedStock: {
-            decrement: item.kuantitas || 0,
-          },
-          recordedFrontStock: {
-            decrement: item.kuantitas || 0,
-          },
-        },
-        create: {
-          masterItemId: masterItem.id,
-          branchId: branch.id,
-          recordedStock: -(item.kuantitas || 0),
-          recordedFrontStock: -(item.kuantitas || 0),
+        });
+      }
+      // create record action
+      await prisma.recordAction.create({
+        data: {
+          actionType: RecordActionType.CREATE,
+          modelId: createSale.id,
+          modelType: RecordActionModelType.TRANSACTION_SALES,
+          userId: user?.id!,
+          payloadBefore: Prisma.DbNull,
+          payloadAfter: createSale,
         },
       });
-    }
-    // create record action
-    await prisma.recordAction.create({
-      data: {
-        actionType: RecordActionType.CREATE,
-        modelId: createSale.id,
-        modelType: RecordActionModelType.TRANSACTION_SALES,
-        userId: user?.id!,
-        payloadBefore: Prisma.DbNull,
-        payloadAfter: createSale,
-      },
-    });
 
-    console.log("✅ Sale created:", createSale.id);
+      console.log("✅ Sales created:", createSale.id);
+    } else {
+      console.log("DETECTED MBG:", sale.header.nomor);
+      totalMbg++;
+
+      const check = await prisma.transactionSell.findFirst({
+        where: {
+          invoiceNumber: sale.header.nomor || `Missing Invoice ${Date.now()}`,
+        },
+      });
+
+      if (check) {
+        console.log(
+          `Skipping sell [MBG] with invoice number ${sale.header.nomor}`,
+        );
+        continue;
+      }
+
+      const createSell = await prisma.transactionSell.create({
+        data: {
+          branchId: branch.id,
+          invoiceNumber: sale.header.nomor || `Missing Invoice ${Date.now()}`,
+          recordedDiscountAmount: totalDiskon,
+          recordedSubTotalAmount: totalSubTotal,
+          recordedTotalAmount: totalTotal,
+          transactionDate: new Date(sale.header.tanggal || new Date()),
+          dueDate: new Date(sale.header.tanggal || new Date()),
+          createdAt: new Date(sale.header.tanggal || new Date()),
+          updatedAt: new Date(sale.header.tanggal || new Date()),
+          masterMemberId: member?.id!,
+          recordedTaxAmount: 0,
+          recordedTaxPercentage: 0,
+        },
+        include: {
+          transactionSellItems: true,
+        },
+      });
+
+      for await (const item of sale.items) {
+        let masterItem = await prisma.masterItem.findFirst({
+          where: {
+            code: item.kode.toUpperCase(),
+          },
+          include: {
+            masterItemVariants: true,
+          },
+        });
+        if (!masterItem) {
+          console.log("🟡 Creating new item:", item.nama, item.kode);
+          masterItem = await prisma.masterItem.create({
+            data: {
+              name: item.nama,
+              code: item.kode.toUpperCase(),
+              isActive: true,
+              recordedBuyPrice: 0,
+              masterItemCategoryId: missingCategory.id,
+              masterSupplierId: missingSupplier.id, // asumsikan supplier missing / karena tidak ada di seed:item
+            },
+            include: {
+              masterItemVariants: true,
+            },
+          });
+        }
+
+        const isVariantExist = masterItem?.masterItemVariants.find(
+          (variant) => variant.unit?.toUpperCase() === item.sat?.toUpperCase(),
+        );
+
+        if (!isVariantExist) {
+          console.log(
+            "🟡 Creating new variant for item:",
+            masterItem.name,
+            item.sat,
+          );
+          const createVariant = await prisma.masterItemVariant.create({
+            data: {
+              // karena tidak ada data mengenai konversi, maka diasumsikan 1
+              unit: item.sat?.toUpperCase(),
+              amount: 1,
+              masterItemId: masterItem.id,
+              isBaseUnit: true,
+              // tidak ada data mengenai harga beli, maka diasumsikan 0
+              recordedBuyPrice: 0,
+              recordedProfitAmount: 0,
+              sellPrice: 0,
+              recordedProfitPercentage: 0,
+            },
+          });
+          masterItem.masterItemVariants.push(createVariant);
+        }
+
+        const masterItemVariant = masterItem.masterItemVariants.find(
+          (variant) => variant.unit?.toUpperCase() === item.sat?.toUpperCase(),
+        );
+
+        const createSellItem = await prisma.transactionSellItem.create({
+          data: {
+            transactionSellId: createSell.id,
+            masterItemId: masterItem.id,
+            qty: item.kuantitas || 0,
+            recordedBuyPrice: new Decimal(
+              masterItem.recordedBuyPrice.mul(masterItemVariant?.amount || 1),
+            ),
+            sellPrice: new Decimal(item.harga || 0),
+            recordedDiscountAmount: new Decimal(item.diskon || 0),
+            //   pada data total adn sub total sama (karena tidak ada pajak dan diskon)
+            recordedTotalAmount: new Decimal(item.jumlah || 0),
+            recordedSubTotalAmount: new Decimal(item.jumlah || 0),
+            masterItemVariantId: masterItemVariant?.id!,
+            // jika tidak ada data mengenai konversi, maka diasumsikan 1
+            recordedConversion: masterItemVariant?.amount || 1,
+            totalQty: (item.kuantitas || 1) * (masterItemVariant?.amount || 1),
+          },
+        });
+        createSell.transactionSellItems.push(createSellItem);
+
+        // catat stok baru
+        const createStock = await prisma.itemBranch.upsert({
+          where: {
+            masterItemId_branchId: {
+              masterItemId: masterItem.id,
+              branchId: branch.id,
+            },
+          },
+          update: {
+            // jika ada decrement dari kuantity * amount (konversi)
+            recordedStock: {
+              decrement:
+                (item.kuantitas || 1) * (masterItemVariant?.amount || 1),
+            },
+            // sell tidak usah update frontstock
+            // recordedFrontStock: {
+            //   decrement:
+            //     (item.kuantitas || 1) * (masterItemVariant?.amount || 1),
+            // },
+          },
+          create: {
+            masterItemId: masterItem.id,
+            branchId: branch.id,
+            // jika tidak ada buat dari kuanity * amount (konversi)
+            recordedStock: -(
+              (item.kuantitas || 1) * (masterItemVariant?.amount || 1)
+            ),
+            // jika tidak ada 0
+            recordedFrontStock: 0,
+          },
+        });
+      }
+      // create record action
+      await prisma.recordAction.create({
+        data: {
+          actionType: RecordActionType.CREATE,
+          modelId: createSell.id,
+          modelType: RecordActionModelType.TRANSACTION_SELL,
+          userId: user?.id!,
+          payloadBefore: Prisma.DbNull,
+          payloadAfter: createSell,
+        },
+      });
+
+      console.log("✅ Sales created:", createSell.id);
+    }
   }
+
+  console.log("equals", equals);
+  console.log("notEquals", notEquals);
+  console.log("totalMbg", totalMbg);
 };
 
 seed().catch((err) => {

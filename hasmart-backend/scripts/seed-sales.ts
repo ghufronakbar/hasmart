@@ -177,24 +177,40 @@ const xlsPath = path.resolve(process.cwd(), "scripts", "PENJUALAN.xls");
 const seed = async () => {
   const doc = readPenjualanXls(xlsPath);
   let dontExist = 0;
+  let totalSales = 0;
+  let totalSell = 0;
   for await (const item of doc.penjualan) {
-    const check = await prisma.transactionSales.findFirst({
+    if (item.nomor === "SL2602000362") {
+      console.log("DEBUG SL2602000362");
+      console.log(item);
+    }
+    const checkSales = await prisma.transactionSales.findFirst({
       where: {
         invoiceNumber: item.nomor,
       },
     });
-    if (check) {
-      console.log(`Sales: ${item.nomor} already exists`);
+    const checkSell = await prisma.transactionSell.findFirst({
+      where: {
+        invoiceNumber: item.nomor,
+      },
+    });
+    if (checkSales) {
+      let totalEveryItem = new Decimal(0);
+      for await (const i of item.items) {
+        totalEveryItem = totalEveryItem.plus(
+          new Decimal(i.hargaJual || 0).mul(i.kts || 1),
+        );
+      }
       const update = await prisma.transactionSales.update({
         where: {
-          id: check.id,
+          id: checkSales.id,
         },
         data: {
-          cashReceived: item.summary?.total || new Decimal(0),
-          cashChange: new Decimal(0),
+          cashReceived: totalEveryItem,
+          cashChange: 0,
           recordedDiscountAmount: item.summary?.diskon || new Decimal(0),
-          recordedSubTotalAmount: item.summary?.subTotal || new Decimal(0),
-          recordedTotalAmount: item.summary?.total || new Decimal(0),
+          recordedSubTotalAmount: totalEveryItem,
+          recordedTotalAmount: totalEveryItem,
         },
       });
       console.log(`Sales: ${item.nomor} updated`);
@@ -202,7 +218,7 @@ const seed = async () => {
       for await (const i of item.items) {
         const checkItem = await prisma.transactionSalesItem.findFirst({
           where: {
-            transactionSalesId: check.id,
+            transactionSalesId: checkSales.id,
             masterItem: {
               code: {
                 equals: i.kode,
@@ -212,7 +228,6 @@ const seed = async () => {
           },
         });
         if (checkItem) {
-          console.log(`Sales Item: ${i.kode} already exists`);
           const checkVariant = await prisma.masterItemVariant.findFirst({
             where: {
               unit: {
@@ -233,8 +248,14 @@ const seed = async () => {
             data: {
               qty: i.kts || 1,
               totalQty: totalQty,
-              recordedBuyPrice: i.hargaPokok || new Decimal(0),
-              salesPrice: i.hargaJual || new Decimal(0),
+              recordedBuyPrice: new Decimal(i.hargaPokok || 0),
+              salesPrice: new Decimal(i.hargaJual || 0),
+              recordedSubTotalAmount: new Decimal(i.hargaJual || 0).mul(
+                i.kts || 1,
+              ),
+              recordedTotalAmount: new Decimal(i.hargaJual || 0).mul(
+                i.kts || 1,
+              ),
             },
           });
           console.log(`Sales Item: ${i.kode} updated`);
@@ -243,15 +264,87 @@ const seed = async () => {
           continue;
         }
       }
+      totalSales++;
+    } // jika check sell
+    else if (checkSell) {
+      let totalEveryItem = new Decimal(0);
+      for await (const i of item.items) {
+        totalEveryItem = totalEveryItem.plus(
+          new Decimal(i.hargaJual || 0).mul(i.kts || 1),
+        );
+      }
+      const update = await prisma.transactionSell.update({
+        where: {
+          id: checkSell.id,
+        },
+        data: {
+          recordedDiscountAmount: item.summary?.diskon || new Decimal(0),
+          recordedSubTotalAmount: totalEveryItem,
+          recordedTotalAmount: totalEveryItem,
+        },
+      });
+      console.log(`Sell: ${item.nomor} updated`);
+
+      for await (const i of item.items) {
+        const checkItem = await prisma.transactionSellItem.findFirst({
+          where: {
+            transactionSellId: checkSell.id,
+            masterItem: {
+              code: {
+                equals: i.kode,
+                mode: "insensitive",
+              },
+            },
+          },
+        });
+        if (checkItem) {
+          const checkVariant = await prisma.masterItemVariant.findFirst({
+            where: {
+              unit: {
+                equals: i.sat,
+                mode: "insensitive",
+              },
+              masterItemId: checkItem.masterItemId,
+            },
+          });
+          let totalQty = i.kts || 1;
+          if (checkVariant) {
+            totalQty = (i.kts || 1) * checkVariant.amount;
+          }
+          const update = await prisma.transactionSellItem.update({
+            where: {
+              id: checkItem.id,
+            },
+            data: {
+              qty: i.kts || 1,
+              totalQty: totalQty,
+              recordedBuyPrice: new Decimal(i.hargaPokok || 0),
+              sellPrice: new Decimal(i.hargaJual || 0),
+              recordedSubTotalAmount: new Decimal(i.hargaJual || 0).mul(
+                i.kts || 1,
+              ),
+              recordedTotalAmount: new Decimal(i.hargaJual || 0).mul(
+                i.kts || 1,
+              ),
+            },
+          });
+          console.log(`Sales Item: ${i.kode} updated`);
+        } else {
+          console.log(`Sales Item: ${i.kode} not exists`);
+          continue;
+        }
+      }
+      totalSell++;
     } else {
       console.log(`🟡 Sales: ${item.nomor} not exists`);
       dontExist++;
       continue;
     }
   }
-  console.log(`Total Sales: ${doc.penjualan.length}`);
-  console.log(`Total Sales Updated: ${doc.penjualan.length - dontExist}`);
-  console.log(`Total Sales Not Updated: ${dontExist}`);
+  console.log(`Total Sales & Sell: ${doc.penjualan.length}`);
+  console.log(`Total Sales Updated: ${totalSales}`);
+  console.log(`Total Sell Updated: ${totalSell}`);
+  console.log(`Total Not Updated: ${dontExist}`);
 };
 
 seed().catch((e) => {

@@ -42,6 +42,7 @@ services:
     ports:
       # Expose Port 9999 Host ke 9999 Container
       # Supaya Frontend (Browser) bisa hit API langsung ke localhost:9999
+      - "5555:5555"
       - "9999:9999" 
 
   # Frontend Service (Next.js)
