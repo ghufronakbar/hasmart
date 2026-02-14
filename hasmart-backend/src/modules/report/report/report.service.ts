@@ -1062,6 +1062,50 @@ export class ReportService extends BaseService {
       };
     });
 
+    // 9. Calculate Totals
+    const totalUserRevenues = new Map<string, Prisma.Decimal>();
+    let totalCashIn = D();
+    let totalCashOut = D();
+    let totalRevenueCash = D();
+    let totalRevenueQris = D();
+    let totalRevenueDebit = D();
+    let totalRevenueSell = D();
+    let totalGrossProfit = D();
+    let totalNetProfit = D();
+
+    reportData.forEach((item) => {
+      item.userRevenues.forEach((ur) => {
+        const current = totalUserRevenues.get(ur.userName) || D();
+        totalUserRevenues.set(ur.userName, current.add(D(ur.amount)));
+      });
+      totalCashIn = totalCashIn.add(D(item.cashIn));
+      totalCashOut = totalCashOut.add(D(item.cashOut));
+      totalRevenueCash = totalRevenueCash.add(D(item.revenueCash));
+      totalRevenueQris = totalRevenueQris.add(D(item.revenueQris));
+      totalRevenueDebit = totalRevenueDebit.add(D(item.revenueDebit));
+      totalRevenueSell = totalRevenueSell.add(D(item.revenueSell));
+      totalGrossProfit = totalGrossProfit.add(D(item.totalGrossProfit));
+      totalNetProfit = totalNetProfit.add(D(item.totalNetProfit));
+    });
+
+    const totalItem: OverallReportItem = {
+      date: "Total",
+      userRevenues: allUserNames.map((name) => ({
+        userName: name,
+        amount: Number(totalUserRevenues.get(name) || D()),
+      })),
+      cashIn: Number(totalCashIn),
+      cashOut: Number(totalCashOut),
+      revenueCash: Number(totalRevenueCash),
+      revenueQris: Number(totalRevenueQris),
+      revenueDebit: Number(totalRevenueDebit),
+      revenueSell: Number(totalRevenueSell),
+      totalGrossProfit: Number(totalGrossProfit),
+      totalNetProfit: Number(totalNetProfit),
+    };
+
+    reportData.push(totalItem);
+
     if (query.exportAs === "pdf" || query.exportAs === "preview") {
       const buffer = await this.pdfService.generateOverallReport(
         reportData,

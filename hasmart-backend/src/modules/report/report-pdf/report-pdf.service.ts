@@ -1209,45 +1209,62 @@ export class ReportPdfService extends BaseService {
       "auto",
     ];
 
-    const bodyRows = data.map((item) => [
-      ReportHelper.formatDate(new Date(item.date)),
-      ...item.userRevenues.map((ur) => ({
-        text: ReportHelper.formatCurrency(ur.amount),
-        alignment: "right" as const,
-      })),
-      {
-        text: ReportHelper.formatCurrency(item.cashIn),
-        alignment: "right" as const,
-      },
-      {
-        text: ReportHelper.formatCurrency(item.cashOut),
-        alignment: "right" as const,
-      },
-      {
-        text: ReportHelper.formatCurrency(item.revenueCash),
-        alignment: "right" as const,
-      },
-      {
-        text: ReportHelper.formatCurrency(item.revenueQris),
-        alignment: "right" as const,
-      },
-      {
-        text: ReportHelper.formatCurrency(item.revenueDebit),
-        alignment: "right" as const,
-      },
-      {
-        text: ReportHelper.formatCurrency(item.revenueSell),
-        alignment: "right" as const,
-      },
-      {
-        text: ReportHelper.formatCurrency(item.totalGrossProfit),
-        alignment: "right" as const,
-      },
-      {
-        text: ReportHelper.formatCurrency(item.totalNetProfit),
-        alignment: "right" as const,
-      },
-    ]);
+    const bodyRows = data.map((item) => {
+      const isTotal = item.date === "Total";
+      return [
+        {
+          text: isTotal
+            ? "Total"
+            : ReportHelper.formatDate(new Date(item.date)),
+          bold: isTotal,
+        },
+        ...item.userRevenues.map((ur) => ({
+          text: ReportHelper.formatCurrency(ur.amount),
+          alignment: "right" as const,
+          bold: isTotal,
+        })),
+        {
+          text: ReportHelper.formatCurrency(item.cashIn),
+          alignment: "right" as const,
+          bold: isTotal,
+        },
+        {
+          text: ReportHelper.formatCurrency(item.cashOut),
+          alignment: "right" as const,
+          bold: isTotal,
+        },
+        {
+          text: ReportHelper.formatCurrency(item.revenueCash),
+          alignment: "right" as const,
+          bold: isTotal,
+        },
+        {
+          text: ReportHelper.formatCurrency(item.revenueQris),
+          alignment: "right" as const,
+          bold: isTotal,
+        },
+        {
+          text: ReportHelper.formatCurrency(item.revenueDebit),
+          alignment: "right" as const,
+          bold: isTotal,
+        },
+        {
+          text: ReportHelper.formatCurrency(item.revenueSell),
+          alignment: "right" as const,
+          bold: isTotal,
+        },
+        {
+          text: ReportHelper.formatCurrency(item.totalGrossProfit),
+          alignment: "right" as const,
+          bold: isTotal,
+        },
+        {
+          text: ReportHelper.formatCurrency(item.totalNetProfit),
+          alignment: "right" as const,
+          bold: isTotal,
+        },
+      ];
+    });
 
     content.push({
       style: "tableExample",

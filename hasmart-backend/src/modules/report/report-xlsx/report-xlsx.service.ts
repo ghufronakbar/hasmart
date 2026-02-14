@@ -818,12 +818,20 @@ export class ReportXlsxService extends BaseService {
     data.forEach((item) => {
       const row = worksheet.getRow(currentRow++);
       let c = 1;
-      row.getCell(c++).value = item.date;
+
+      if (item.date === "Total") {
+        const dateCell = row.getCell(c++);
+        dateCell.value = "Total";
+        dateCell.font = { bold: true };
+      } else {
+        row.getCell(c++).value = item.date;
+      }
 
       item.userRevenues.forEach((ur) => {
         const cell = row.getCell(c++);
         cell.value = ur.amount;
         cell.numFmt = "#,##0.00";
+        if (item.date === "Total") cell.font = { bold: true };
       });
 
       const numCells = [
@@ -841,6 +849,7 @@ export class ReportXlsxService extends BaseService {
         const cell = row.getCell(c++);
         cell.value = val;
         cell.numFmt = "#,##0.00";
+        if (item.date === "Total") cell.font = { bold: true };
       });
     });
 
