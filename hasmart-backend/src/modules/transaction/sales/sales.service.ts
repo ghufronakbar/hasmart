@@ -181,7 +181,22 @@ export class SalesService extends BaseService {
         transactionSalesItems: {
           where: { deletedAt: null },
           include: {
-            masterItem: { select: { id: true, name: true, code: true } },
+            masterItem: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                masterItemVariants: {
+                  where: { deletedAt: null },
+                  select: {
+                    id: true,
+                    unit: true,
+                    amount: true,
+                    sellPrice: true,
+                  },
+                },
+              },
+            },
             masterItemVariant: {
               select: { id: true, unit: true, amount: true },
             },
@@ -230,6 +245,13 @@ export class SalesService extends BaseService {
                 id: true,
                 unit: true,
                 amount: true,
+                masterItem: {
+                  select: {
+                    id: true,
+                    name: true,
+                    code: true,
+                  },
+                },
               },
             },
             transactionSalesDiscounts: {

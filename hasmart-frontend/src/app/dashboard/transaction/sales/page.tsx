@@ -515,7 +515,7 @@ export default function SalesPage() {
 
     // --- Item Selection Logic ---
     const handleItemSelect = (index: number, itemId: number) => {
-        const item = items?.data?.find(i => i.id === itemId);
+        const item = itemOptions.find(i => i.id === itemId);
         if (item && item.masterItemVariants?.length > 0) {
             form.setValue(`items.${index}.masterItemId`, itemId);
             form.setValue(`items.${index}.masterItemVariantId`, 0); // Reset variant
@@ -528,8 +528,8 @@ export default function SalesPage() {
         form.setValue(`items.${index}.masterItemVariantId`, variantId);
         // If variant has price, set it
         const itemId = form.getValues(`items.${index}.masterItemId`);
-        const item = items?.data?.find(i => i.id === itemId);
-        const variant = item?.masterItemVariants?.find(v => v.id === variantId);
+        const item = itemOptions.find(i => i.id === itemId);
+        const variant = item?.masterItemVariants?.find((v: { id: number; }) => v.id === variantId);
         if (variant && variant.sellPrice) {
             form.setValue(`items.${index}.salesPrice`, parseFloat(variant.sellPrice));
         }
@@ -1013,25 +1013,25 @@ export default function SalesPage() {
                             </Form>
                         </div>
                     )}
-
-                    <AlertDialog open={!!deletingId} onOpenChange={() => setDeletingId(null)}>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>Apakah anda yakin?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    Data penjualan ini akan dihapus. Stok akan dikembalikan (bertambah).
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Batal</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleDelete} className="bg-red-600">
-                                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Hapus"}
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
                 </DialogContent>
             </Dialog>
+
+            <AlertDialog open={!!deletingId} onOpenChange={(o) => !o && setDeletingId(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Apakah anda yakin?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Data penjualan ini akan dihapus. Stok akan dikembalikan (bertambah).
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setDeletingId(null)}>Batal</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
+                            {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Hapus
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div >
     );
 }
