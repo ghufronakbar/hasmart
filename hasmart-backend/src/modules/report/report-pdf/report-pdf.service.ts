@@ -537,7 +537,7 @@ export class ReportPdfService extends BaseService {
         style: "tableExample",
         table: {
           headerRows: 1,
-          widths: ["*", "auto", "auto", "auto", "auto", "auto", "auto"],
+          widths: ["*", "auto", "auto", "auto", "auto", "auto"],
           body: [
             [
               { text: "Nama Barang", style: "tableHeader" },
@@ -702,7 +702,17 @@ export class ReportPdfService extends BaseService {
         style: "tableExample",
         table: {
           headerRows: 1,
-          widths: ["*", "auto", "auto", "auto", "auto", "auto", "auto", "auto"],
+          widths: [
+            "*",
+            "auto",
+            "auto",
+            "auto",
+            "auto",
+            "auto",
+            "auto",
+            "auto",
+            "auto",
+          ],
           body: [
             [
               { text: "Nama Barang", style: "tableHeader" },
