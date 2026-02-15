@@ -359,7 +359,8 @@ export class SellService extends BaseService {
       const recordedTotalAmount =
         recordedSubTotalAmount.sub(totalDiscountAmount);
 
-      const recordedBuyPrice = variant.masterItem.recordedBuyPrice;
+      const recordedBuyPrice =
+        variant.masterItem.recordedBuyPrice.mul(recordedConversion);
 
       return {
         masterItemId: variant.masterItemId,

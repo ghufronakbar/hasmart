@@ -241,9 +241,8 @@ export class ReportService extends BaseService {
 
       const salesItems = t.transactionSalesItems.map((item) => {
         const revenue = Number(item.recordedTotalAmount);
-        const buyPricePerUnit =
-          Number(item.recordedBuyPrice) * item.masterItemVariant.amount;
-        const totalCost = buyPricePerUnit * item.qty;
+        const buyPricePerVariant = Number(item.recordedBuyPrice);
+        const totalCost = buyPricePerVariant * item.qty;
         const netProfit = revenue - totalCost;
 
         totalNetProfit += netProfit;
@@ -258,7 +257,7 @@ export class ReportService extends BaseService {
           total: Number(item.recordedTotalAmount), // Revenue
           grossProfit: revenue,
           netProfit: netProfit,
-          buyPrice: buyPricePerUnit,
+          buyPrice: buyPricePerVariant,
         };
       });
 
