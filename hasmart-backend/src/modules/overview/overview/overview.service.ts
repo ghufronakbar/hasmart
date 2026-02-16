@@ -29,6 +29,7 @@ interface StockAlertItem {
   code: string;
   currentStock: number;
   unit: string;
+  category: string;
 }
 
 // Helper functions for date manipulation
@@ -348,6 +349,9 @@ export class OverviewService extends BaseService {
           select: {
             name: true,
             code: true,
+            masterItemCategory: {
+              select: { name: true },
+            },
             masterItemVariants: {
               where: { isBaseUnit: true, deletedAt: null },
               select: { unit: true },
@@ -365,6 +369,7 @@ export class OverviewService extends BaseService {
       code: item.masterItem.code,
       currentStock: item.recordedStock,
       unit: item.masterItem.masterItemVariants[0]?.unit || "PCS",
+      category: item.masterItem.masterItemCategory.name,
     }));
   };
 }

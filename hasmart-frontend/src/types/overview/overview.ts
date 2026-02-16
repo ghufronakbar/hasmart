@@ -36,6 +36,7 @@ export interface StockAlertItem {
   code: string;
   currentStock: number;
   unit: string;
+  category: string;
 }
 
 export type StockAlertsResponse = BaseResponse<StockAlertItem[]>;

@@ -840,8 +840,13 @@ export default function SalesPage() {
                                                 const variants = selectedItem?.masterItemVariants || [];
                                                 const currentDiscounts = currentItem.discounts || [];
 
+                                                // Check if item has missing category
+                                                const categoryName = selectedItem?.masterItemCategory?.name;
+                                                const isMissingCategory = categoryName === "MISSING" || categoryName === "Missing Category";
+                                                const bgClass = isMissingCategory ? "bg-red-500/10" : "bg-muted/10";
+
                                                 return (
-                                                    <div key={field.id} className="grid grid-cols-12 gap-4 items-start border p-4 rounded-lg bg-muted/10 relative">
+                                                    <div key={field.id} className={`grid grid-cols-12 gap-4 items-start border p-4 rounded-lg ${bgClass} relative`}>
                                                         <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-red-500" onClick={() => remove(index)}>
                                                             <X className="h-4 w-4" />
                                                         </Button>

@@ -75,17 +75,17 @@ export class SalesService extends BaseService {
       branchId: branchQuery?.branchId,
       OR: filter?.search
         ? [
-            { invoiceNumber: { contains: filter.search, mode: "insensitive" } },
-            { notes: { contains: filter.search, mode: "insensitive" } },
-            {
-              masterMember: {
-                OR: [
-                  { name: { contains: filter.search, mode: "insensitive" } },
-                  { code: { contains: filter.search, mode: "insensitive" } },
-                ],
-              },
+          { invoiceNumber: { contains: filter.search, mode: "insensitive" } },
+          { notes: { contains: filter.search, mode: "insensitive" } },
+          {
+            masterMember: {
+              OR: [
+                { name: { contains: filter.search, mode: "insensitive" } },
+                { code: { contains: filter.search, mode: "insensitive" } },
+              ],
             },
-          ]
+          },
+        ]
         : undefined,
     };
 
@@ -121,7 +121,16 @@ export class SalesService extends BaseService {
         transactionSalesItems: {
           where: { deletedAt: null },
           include: {
-            masterItem: { select: { id: true, name: true, code: true } },
+            masterItem: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                masterItemCategory: {
+                  select: { id: true, code: true, name: true },
+                },
+              },
+            },
             masterItemVariant: { select: { id: true, unit: true } },
             transactionSalesDiscounts: {
               where: { deletedAt: null },
@@ -186,6 +195,9 @@ export class SalesService extends BaseService {
                 id: true,
                 name: true,
                 code: true,
+                masterItemCategory: {
+                  select: { id: true, code: true, name: true },
+                },
                 masterItemVariants: {
                   where: { deletedAt: null },
                   select: {
@@ -231,6 +243,9 @@ export class SalesService extends BaseService {
                 id: true,
                 name: true,
                 code: true,
+                masterItemCategory: {
+                  select: { id: true, code: true, name: true },
+                },
                 masterItemVariants: {
                   select: {
                     id: true,
