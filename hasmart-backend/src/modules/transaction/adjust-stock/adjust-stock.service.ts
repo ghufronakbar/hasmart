@@ -13,6 +13,7 @@ import {
   RecordActionType,
 } from ".prisma/client";
 import { BranchQueryType } from "src/middleware/use-branch";
+import { RecordLedgerStockService } from "../record-ledger-stock/record-ledger-stock.service";
 
 interface CalculatedAdjustment {
   masterItemId: number;
@@ -30,6 +31,7 @@ export class AdjustStockService extends BaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly refreshStockService: RefreshStockService,
+    private readonly recordLedgerStockService: RecordLedgerStockService,
   ) {
     super();
   }
@@ -332,6 +334,24 @@ export class AdjustStockService extends BaseService {
         ),
       );
 
+      await Promise.all(
+        created.map((adj) =>
+          this.recordLedgerStockService.recordAdjustmentCreate(
+            {
+              branchId: data.branchId,
+              modelId: adj.id,
+              userId,
+              gapAmount: adj.totalGapAmount,
+              transactionDate: data.transactionDate,
+              masterItemId: adj.masterItemId,
+              recordedStockAfterAmount: adj.finalTotalAmount,
+              recordedStockBeforeAmount: adj.beforeTotalAmount,
+            },
+            tx,
+          ),
+        ),
+      );
+
       return created;
     });
 
@@ -364,22 +384,31 @@ export class AdjustStockService extends BaseService {
 
     const deleted = await this.prisma.$transaction(async (tx) => {
       // Soft delete the adjustment
-      const result = await tx.transactionAdjustment.update({
-        where: { id },
-        data: { deletedAt: new Date() },
-      });
-
-      // Record action
-      await tx.recordAction.create({
-        data: {
-          modelType: RecordActionModelType.TRANSACTION_ADJUSTMENT,
-          modelId: id,
-          actionType: RecordActionType.DELETE,
-          payloadBefore: existing as unknown as Prisma.JsonObject,
-          payloadAfter: Prisma.DbNull,
-          userId,
-        },
-      });
+      const [result] = await Promise.all([
+        tx.transactionAdjustment.update({
+          where: { id },
+          data: { deletedAt: new Date() },
+        }),
+        // Record action
+        tx.recordAction.create({
+          data: {
+            modelType: RecordActionModelType.TRANSACTION_ADJUSTMENT,
+            modelId: id,
+            actionType: RecordActionType.DELETE,
+            payloadBefore: existing as unknown as Prisma.JsonObject,
+            payloadAfter: Prisma.DbNull,
+            userId,
+          },
+        }),
+        this.recordLedgerStockService.recordAdjustmentDelete(
+          {
+            branchId: existing.branchId,
+            modelId: existing.id,
+            userId,
+          },
+          tx,
+        ),
+      ]);
 
       return result;
     });

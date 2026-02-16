@@ -1,14 +1,22 @@
-import { LedgerStockActionType, LedgerStockModelType } from ".prisma/client";
+import {
+  LedgerStockActionType,
+  LedgerStockModelType,
+  Prisma,
+  PrismaClient,
+} from ".prisma/client";
 import { BaseService } from "../../../base/base-service";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import {
   CommonRecordModel,
+  RecordAdjustmentPayloadCreate,
+  RecordAdjustmentPayloadDelete,
   RecordCommonPayloadCreate,
   RecordCommonPayloadDelete,
   RecordCommonPayloadUpdate,
 } from "./record-ledger-stock.interface";
 import { BadRequestError } from "../../../utils/error";
 import { ItemService } from "../../master/item/item.service";
+import { DefaultArgs } from "@prisma/client/runtime/library";
 
 /**
  * Konfigurasi arah stok per tipe transaksi:
@@ -432,5 +440,85 @@ export class RecordLedgerStockService extends BaseService {
         };
       }
     }
+  };
+
+  recordAdjustmentCreate = async (
+    payload: RecordAdjustmentPayloadCreate,
+    tx: Omit<
+      PrismaClient<Prisma.PrismaClientOptions, never, DefaultArgs>,
+      "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+    >,
+  ) => {
+    const {
+      modelId,
+      branchId,
+      transactionDate,
+      gapAmount,
+      masterItemId,
+      recordedStockAfterAmount,
+      recordedStockBeforeAmount,
+      userId,
+    } = payload;
+    await tx.ledgerStock.create({
+      data: {
+        modelId,
+        parentId: modelId,
+        actionType: LedgerStockActionType.CREATE,
+        modelType: LedgerStockModelType.TRANSACTION_ADJUSTMENT,
+        branchId,
+        userId,
+        transactionDate,
+        recordedStockAfterAmount,
+        recordedStockBeforeAmount,
+        beforeDataAmount: 0, // karena create
+        gapAmount,
+        masterItemId,
+      },
+    });
+  };
+
+  recordAdjustmentDelete = async (
+    payload: RecordAdjustmentPayloadDelete,
+    tx: Omit<
+      PrismaClient<Prisma.PrismaClientOptions, never, DefaultArgs>,
+      "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+    >,
+  ) => {
+    const { branchId, modelId, userId } = payload;
+    const adjustmentData = await tx.transactionAdjustment.findUnique({
+      where: { id: modelId },
+      select: {
+        transactionDate: true,
+        masterItemId: true,
+        totalGapAmount: true,
+        masterItem: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+    if (!adjustmentData) {
+      throw new BadRequestError("Adjustment data not found");
+    }
+    const item = await this.itemSvc.getItemById(adjustmentData.masterItem.id, {
+      branchId,
+    });
+    await this.prisma.ledgerStock.create({
+      data: {
+        modelId,
+        parentId: modelId,
+        actionType: LedgerStockActionType.DELETE,
+        modelType: LedgerStockModelType.TRANSACTION_ADJUSTMENT,
+        branchId,
+        userId,
+        transactionDate: adjustmentData.transactionDate,
+        recordedStockAfterAmount: item.stock - adjustmentData.totalGapAmount, // kalkulasi stock setelah delete
+        recordedStockBeforeAmount: item.stock,
+        beforeDataAmount: adjustmentData.totalGapAmount, // data lama
+        masterItemId: adjustmentData.masterItemId,
+        gapAmount: -adjustmentData.totalGapAmount, // kebalikan dari create
+      },
+    });
   };
 }

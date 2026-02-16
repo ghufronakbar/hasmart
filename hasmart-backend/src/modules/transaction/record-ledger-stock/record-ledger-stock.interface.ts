@@ -1,5 +1,6 @@
 import { LedgerStockModelType } from ".prisma/client";
 
+// COMMON
 export type CommonRecordModel = Exclude<
   LedgerStockModelType,
   | "TRANSACTION_TRANSFER_IN"
@@ -44,4 +45,22 @@ export interface RecordCommonPayloadUpdate {
     totalQty: number; // qty baru (setelah update)
     oldTotalQty: number; // qty lama (sebelum update), 0 jika item baru
   }[];
+}
+
+// ADJUSTMENT
+export interface RecordAdjustmentPayloadCreate {
+  userId: number;
+  modelId: number;
+  masterItemId: number;
+  branchId: number;
+  transactionDate: Date;
+  gapAmount: number;
+  recordedStockAfterAmount: number; // recorded stock after adjustment
+  recordedStockBeforeAmount: number; // recorded stock before adjustment
+}
+
+export interface RecordAdjustmentPayloadDelete {
+  userId: number;
+  modelId: number;
+  branchId: number;
 }
