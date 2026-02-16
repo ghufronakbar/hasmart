@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { DatePickerWithRange } from "@/components/custom/date-picker-with-range";
 import { DateRange } from "react-day-picker";
 import { startOfMonth, endOfMonth, format } from "date-fns";
+import { cn } from "@/lib/utils";
 import {
     useFinancialSummary,
     useSalesTrend,
@@ -341,11 +342,18 @@ export default function OverviewPage() {
                             {alerts.map((item, index) => (
                                 <div
                                     key={index}
-                                    className="flex items-center justify-between rounded-lg border p-3"
+                                    className={cn(
+                                        "flex items-center justify-between rounded-lg border p-3",
+                                        (item.category === "Missing Category") &&
+                                        "bg-red-500/10",
+                                    )}
                                 >
                                     <div className="space-y-1">
                                         <p className="text-sm font-medium leading-none">{item.name}</p>
                                         <p className="text-xs text-muted-foreground">{item.code}</p>
+                                        {item.category === "Missing Category" && (
+                                            <p className="text-xs font-bold text-red-500">BARANG HILANG</p>
+                                        )}
                                     </div>
                                     <Badge
                                         variant={item.currentStock <= 3 ? "destructive" : "secondary"}
