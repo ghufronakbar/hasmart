@@ -35,18 +35,23 @@ export const menuItems: MenuItem[] = [
         access: UserAccess.accessPrintLabelRead,
     },
     {
-        title: "Stok Depan",
+        title: "Stok",
         icon: <LampDeskIcon className="h-4 w-4" />,
         children: [
             {
                 title: "Stok Depan",
-                href: "/dashboard/front-stock/item",
+                href: "/dashboard/stock/front-item",
                 access: UserAccess.accessFrontStockRead,
             },
             {
                 title: "Riwayat Transfer Stok Depan",
-                href: "/dashboard/front-stock/transfer-history",
+                href: "/dashboard/stock/front-item-history",
                 access: UserAccess.accessFrontStockHistoryRead,
+            },
+            {
+                title: "Riwayat Transaksi Stok",
+                href: "/dashboard/stock/ledger-item",
+                access: UserAccess.accessLedgerStockRead,
             }
         ]
     },

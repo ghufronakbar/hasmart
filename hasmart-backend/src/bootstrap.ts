@@ -114,6 +114,11 @@ import { FrontStockService } from "./modules/stock/front-stock/front-stock.servi
 import { FrontStockController } from "./modules/stock/front-stock/front-stock.controller";
 import { FrontStockRouter } from "./modules/stock/front-stock/front-stock.route";
 
+// Ledger Stock Module
+import { LedgerStockService } from "./modules/stock/ledger-stock/ledger-stock.service";
+import { LedgerStockController } from "./modules/stock/ledger-stock/ledger-stock.controller";
+import { LedgerStockRouter } from "./modules/stock/ledger-stock/ledger-stock.route";
+
 // Cash Flow Module
 import { CashFlowService } from "./modules/transaction/cash-flow/cash-flow.service";
 import { CashFlowController } from "./modules/transaction/cash-flow/cash-flow.controller";
@@ -311,6 +316,14 @@ const frontStockService = new FrontStockService(
 const frontStockController = new FrontStockController(frontStockService);
 const frontStockRouter = new FrontStockRouter(frontStockController, jwtService);
 
+// init ledger-stock module
+const ledgerStockService = new LedgerStockService(prismaService);
+const ledgerStockController = new LedgerStockController(ledgerStockService);
+const ledgerStockRouter = new LedgerStockRouter(
+  ledgerStockController,
+  jwtService,
+);
+
 // init cash-flow module
 const cashFlowService = new CashFlowService(prismaService);
 const cashFlowController = new CashFlowController(cashFlowService);
@@ -353,6 +366,7 @@ api.use("/report", reportRouter.router);
 api.use("/report/receipt", receiptRouter.router);
 api.use("/report/label", labelRouter.router);
 api.use("/stock/front-stock", frontStockRouter.router);
+api.use("/stock/ledger-stock", ledgerStockRouter.router);
 api.use("/transaction/cash-flow", cashFlowRouter.router);
 api.use("/data", backupRestoreRouter.router);
 

@@ -28,6 +28,7 @@ const UserAccessSchema = z.object({
   accessFrontStockRead: z.boolean().default(false),
   accessFrontStockWrite: z.boolean().default(false),
   accessFrontStockHistoryRead: z.boolean().default(false),
+  accessLedgerStockRead: z.boolean().default(false),
   accessAppUserRead: z.boolean().default(false),
   accessAppUserWrite: z.boolean().default(false),
   accessAppBranchWrite: z.boolean().default(false),

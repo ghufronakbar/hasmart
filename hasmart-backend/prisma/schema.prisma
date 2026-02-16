@@ -44,8 +44,9 @@ model Branch {
   frontStockTransfers        FrontStockTransfer[]
 
   // ledger stocks
-  ledgerStocks   LedgerStock[] @relation("BranchLedger") // actioner
-  ledgerStocksTo LedgerStock[] @relation("ToLedger") // jika menerima transfer stock
+  ledgerStocks     LedgerStock[] @relation("BranchLedger") // actioner
+  ledgerStocksTo   LedgerStock[] @relation("ToLedger") // untuk TRANSACTION_TRANSFER_OUT
+  ledgerStocksFrom LedgerStock[] @relation("FromLedger") // untuk TRANSACTION_TRANSFER_IN
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
@@ -85,6 +86,7 @@ model User {
   accessFrontStockRead        Boolean @default(false) @map("access_front_stock_read")
   accessFrontStockWrite       Boolean @default(false) @map("access_front_stock_write")
   accessFrontStockHistoryRead Boolean @default(false) @map("access_front_stock_history_read")
+  accessLedgerStockRead       Boolean @default(false) @map("access_ledger_stock_read")
 
   // access app
   accessAppUserRead    Boolean @default(false) @map("access_app_user_read")
@@ -1157,6 +1159,10 @@ model LedgerStock {
   // jika ada target branch (TRANSACTION_TRANSFER_OUT)
   toBranchId Int?    @map("to_branch_id")
   toBranch   Branch? @relation("ToLedger", fields: [toBranchId], references: [id])
+
+  // jika ada from branch (TRANSACTION_TRANSFER_IN)
+  fromBranchId Int?    @map("from_branch_id")
+  fromBranch   Branch? @relation("FromLedger", fields: [fromBranchId], references: [id])
 
   // jika ada supplier (TRANSACTION_PURCHASE/RETURN)
   masterSupplierId Int?            @map("supplier_id")

@@ -18,6 +18,7 @@ export interface User {
   accessFrontStockRead: boolean;
   accessFrontStockWrite: boolean;
   accessFrontStockHistoryRead: boolean;
+  accessLedgerStockRead: boolean;
   accessAppUserRead: boolean;
   accessAppUserWrite: boolean;
   accessAppBranchWrite: boolean;
@@ -73,6 +74,7 @@ export interface CreateUserDTO {
   accessFrontStockRead?: boolean;
   accessFrontStockWrite?: boolean;
   accessFrontStockHistoryRead?: boolean;
+  accessLedgerStockRead?: boolean;
   accessAppUserRead?: boolean;
   accessAppUserWrite?: boolean;
   accessAppBranchWrite?: boolean;
@@ -118,6 +120,7 @@ export interface UpdateUserAccessDTO {
   accessFrontStockRead: boolean;
   accessFrontStockWrite: boolean;
   accessFrontStockHistoryRead: boolean;
+  accessLedgerStockRead: boolean;
   accessAppUserRead: boolean;
   accessAppUserWrite: boolean;
   accessAppBranchWrite: boolean;

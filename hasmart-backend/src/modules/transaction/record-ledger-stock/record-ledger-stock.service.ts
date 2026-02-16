@@ -575,7 +575,7 @@ export class RecordLedgerStockService extends BaseService {
         if (!itemStock) {
           this.warn(`Item stock not found for item ${item.masterItemId}`);
         }
-        // tidak perlu to branch (karena sebagai penerima)
+
         await tx.ledgerStock.create({
           data: {
             modelId: item.id,
@@ -583,6 +583,7 @@ export class RecordLedgerStockService extends BaseService {
             actionType: LedgerStockActionType.CREATE,
             modelType: LedgerStockModelType.TRANSACTION_TRANSFER_IN,
             branchId: toBranchId,
+            fromBranchId: branchId,
             userId,
             transactionDate,
             beforeDataAmount: 0, // karena create
@@ -675,6 +676,7 @@ export class RecordLedgerStockService extends BaseService {
             actionType: LedgerStockActionType.DELETE,
             modelType: LedgerStockModelType.TRANSACTION_TRANSFER_IN,
             branchId: transferData.toId,
+            fromBranchId: transferData.fromId,
             userId,
             transactionDate: transferData.transactionDate,
             beforeDataAmount: item.totalQty, // cek data lama
