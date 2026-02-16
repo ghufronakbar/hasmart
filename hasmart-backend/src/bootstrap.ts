@@ -123,6 +123,7 @@ import { CashFlowRouter } from "./modules/transaction/cash-flow/cash-flow.route"
 import { BackupRestoreRouter } from "./modules/data/backup-restore/backup-restore.route";
 import { BackupRestoreService } from "./modules/data/backup-restore/backup-restore.service";
 import { BackupRestoreController } from "./modules/data/backup-restore/backup-restore.controller";
+import { RecordLedgerStockService } from "./modules/transaction/record-ledger-stock/record-ledger-stock.service";
 
 const api = express.Router();
 
@@ -136,7 +137,17 @@ const jwtService = new JwtService(cfg, prismaService);
 
 // init transaction common services
 const refreshStockService = new RefreshStockService(prismaService);
+
 const refreshBuyPriceService = new RefreshBuyPriceService(prismaService);
+// init item module
+const itemService = new ItemService(prismaService, refreshBuyPriceService);
+const itemController = new ItemController(itemService);
+const itemRouter = new ItemRouter(itemController, jwtService);
+
+const recordLedgerStockService = new RecordLedgerStockService(
+  prismaService,
+  itemService,
+);
 
 // init branch module
 const branchService = new BranchService(prismaService);
@@ -155,11 +166,6 @@ const itemCategoryRouter = new ItemCategoryRouter(
   itemCategoryController,
   jwtService,
 );
-
-// init item module
-const itemService = new ItemService(prismaService, refreshBuyPriceService);
-const itemController = new ItemController(itemService);
-const itemRouter = new ItemRouter(itemController, jwtService);
 
 // init supplier module
 const supplierService = new SupplierService(prismaService);
@@ -191,6 +197,7 @@ const purchaseService = new PurchaseService(
   prismaService,
   refreshStockService,
   refreshBuyPriceService,
+  recordLedgerStockService,
 );
 const purchaseController = new PurchaseController(purchaseService);
 const purchaseRouter = new PurchaseRouter(purchaseController, jwtService);
@@ -200,6 +207,7 @@ const purchaseReturnService = new PurchaseReturnService(
   prismaService,
   refreshStockService,
   refreshBuyPriceService,
+  recordLedgerStockService,
 );
 const purchaseReturnController = new PurchaseReturnController(
   purchaseReturnService,
@@ -210,7 +218,11 @@ const purchaseReturnRouter = new PurchaseReturnRouter(
 );
 
 // init sales module
-const salesService = new SalesService(prismaService, refreshStockService);
+const salesService = new SalesService(
+  prismaService,
+  refreshStockService,
+  recordLedgerStockService,
+);
 const salesController = new SalesController(salesService);
 const salesRouter = new SalesRouter(salesController, jwtService);
 
@@ -218,6 +230,7 @@ const salesRouter = new SalesRouter(salesController, jwtService);
 const salesReturnService = new SalesReturnService(
   prismaService,
   refreshStockService,
+  recordLedgerStockService,
 );
 const salesReturnController = new SalesReturnController(salesReturnService);
 const salesReturnRouter = new SalesReturnRouter(
@@ -226,7 +239,11 @@ const salesReturnRouter = new SalesReturnRouter(
 );
 
 // init sell module
-const sellService = new SellService(prismaService, refreshStockService);
+const sellService = new SellService(
+  prismaService,
+  refreshStockService,
+  recordLedgerStockService,
+);
 const sellController = new SellController(sellService);
 const sellRouter = new SellRouter(sellController, jwtService);
 
@@ -234,12 +251,17 @@ const sellRouter = new SellRouter(sellController, jwtService);
 const sellReturnService = new SellReturnService(
   prismaService,
   refreshStockService,
+  recordLedgerStockService,
 );
 const sellReturnController = new SellReturnController(sellReturnService);
 const sellReturnRouter = new SellReturnRouter(sellReturnController, jwtService);
 
 // init transfer module
-const transferService = new TransferService(prismaService, refreshStockService);
+const transferService = new TransferService(
+  prismaService,
+  refreshStockService,
+  recordLedgerStockService,
+);
 const transferController = new TransferController(transferService);
 const transferRouter = new TransferRouter(transferController, jwtService);
 
@@ -247,6 +269,7 @@ const transferRouter = new TransferRouter(transferController, jwtService);
 const adjustStockService = new AdjustStockService(
   prismaService,
   refreshStockService,
+  recordLedgerStockService,
 );
 const adjustStockController = new AdjustStockController(adjustStockService);
 const adjustStockRouter = new AdjustStockRouter(

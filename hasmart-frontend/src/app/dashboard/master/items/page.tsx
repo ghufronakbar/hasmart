@@ -51,8 +51,10 @@ import {
     AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
+    AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogHeader,
+    AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
 import {
@@ -1139,7 +1141,10 @@ export default function ItemsPage() {
             {/* --- DELETE ITEM ALERT --- */}
             <AlertDialog open={!!deletingItem} onOpenChange={(o) => !o && setDeletingItem(null)}>
                 <AlertDialogContent>
-                    <AlertDialogHeader><DialogTitle>Hapus Item?</DialogTitle></AlertDialogHeader>
+                    <AlertDialogHeader><AlertDialogTitle>Hapus Item?</AlertDialogTitle></AlertDialogHeader>
+                    <AlertDialogDescription>
+                        Tindakan ini akan menghapus item {deletingItem?.name}.
+                    </AlertDialogDescription>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Batal</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDeleteItem} className="bg-red-600">Hapus</AlertDialogAction>

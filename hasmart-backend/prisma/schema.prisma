@@ -40,8 +40,12 @@ model Branch {
   transactionTransfersFroms  TransactionTransfer[]       @relation("FromTransfer")
   transactionTransferTos     TransactionTransfer[]       @relation("ToTransfer")
   transactionAdjustments     TransactionAdjustment[]
-  frontStockTransfers        FrontStockTransfer[]
   transactionCashFlows       TransactionCashFlow[]
+  frontStockTransfers        FrontStockTransfer[]
+
+  // ledger stocks
+  ledgerStocks   LedgerStock[] @relation("BranchLedger") // actioner
+  ledgerStocksTo LedgerStock[] @relation("ToLedger") // jika menerima transfer stock
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
@@ -67,6 +71,7 @@ model User {
   recordActions         RecordAction[]
   itemBuyPriceOverrides ItemBuyPriceOverride[]
   frontStockTransfers   FrontStockTransfer[]
+  ledgerStocks          LedgerStock[]
 
   refreshToken String? @unique @map("refresh_token") @db.Text()
 
@@ -189,6 +194,9 @@ model MasterItem {
 
   // track front stock transfer
   frontStockTransferItems FrontStockTransferItem[]
+
+  // ledger
+  ledgerStocks LedgerStock[]
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
@@ -324,6 +332,7 @@ model MasterSupplier {
   masterItems                MasterItem[]
   transactionPurchases       TransactionPurchase[]
   transactionPurchaseReturns TransactionPurchaseReturn[]
+  ledgerStocks               LedgerStock[]
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
@@ -382,6 +391,9 @@ model MasterMember {
   // track sell & returns
   transactionSells       TransactionSell[]
   transactionSellReturns TransactionSellReturn[]
+
+  // track ledger stocks
+  ledgerStocks LedgerStock[]
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
@@ -1119,4 +1131,78 @@ model TransactionCashFlow {
 enum TransactionCashFlowType {
   IN
   OUT
+}
+
+// [LEDGER STOCK]
+// untuk mencatat setiap perubahan stok (setiap item (base unit))
+model LedgerStock {
+  id Int @id @default(autoincrement()) @map("id")
+
+  // item
+  masterItemId Int        @map("master_item_id")
+  masterItem   MasterItem @relation(fields: [masterItemId], references: [id])
+
+  // branch
+  branchId Int    @map("branch_id")
+  branch   Branch @relation("BranchLedger", fields: [branchId], references: [id])
+
+  // action record
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id])
+
+  // jika ada member (TRANSACTION_SALES/RETURN, TRANSACTION_SELL/RETURN)
+  masterMemberId Int?          @map("member_id")
+  member         MasterMember? @relation(fields: [masterMemberId], references: [id])
+
+  // jika ada target branch (TRANSACTION_TRANSFER_OUT)
+  toBranchId Int?    @map("to_branch_id")
+  toBranch   Branch? @relation("ToLedger", fields: [toBranchId], references: [id])
+
+  // jika ada supplier (TRANSACTION_PURCHASE/RETURN)
+  masterSupplierId Int?            @map("supplier_id")
+  masterSupplier   MasterSupplier? @relation(fields: [masterSupplierId], references: [id])
+
+  // catat perubahan
+  parentId                  Int                   @map("parent_id") // untuk mencatat jika itu edit/delete, jika create maka val 0
+  modelId                   Int                   @map("model_id") // langsung ke item
+  beforeDataAmount          Int                   @map("before_data_amount") // digunakan untuk merecord jika itu edit/delete, jika create maka val 0
+  // inputtedAmount            Int                   @map("inputted_amount") // yang diisi user
+  gapAmount                 Int                   @map("gap_amount") // bisa negatif (misal jual 3, berarti -3)
+  recordedStockBeforeAmount Int                   @map("recorded_stock_before_amount") // sebelum perubahan
+  recordedStockAfterAmount  Int                   @map("recorded_stock_after_amount") // total amount setelah perubahan
+  modelType                 LedgerStockModelType  @map("model_type")
+  actionType                LedgerStockActionType @map("action_type")
+
+  transactionDate DateTime  @map("transaction_date")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+}
+
+// note:
+// untuk TRANSACTION_TRANSFER_IN dan TRANSACTION_TRANSFER_OUT, langsung buat 2 data
+// untuk out (minus) wajib dengan toBranchId dan in (plus)
+// adjustment simpan gapnya juga
+
+enum LedgerStockModelType {
+  // common
+  TRANSACTION_PURCHASE
+  TRANSACTION_PURCHASE_RETURN
+  TRANSACTION_SALES
+  TRANSACTION_SALES_RETURN
+  TRANSACTION_SELL
+  TRANSACTION_SELL_RETURN
+
+  // transfer
+  TRANSACTION_TRANSFER_IN
+  TRANSACTION_TRANSFER_OUT
+
+  // adjustment
+  TRANSACTION_ADJUSTMENT
+}
+
+enum LedgerStockActionType {
+  CREATE
+  UPDATE
+  DELETE
 }

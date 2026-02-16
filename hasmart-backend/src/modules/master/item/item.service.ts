@@ -635,4 +635,48 @@ export class ItemService extends BaseService {
 
     return true;
   };
+
+  getItemStockByIds = async (ids: number[], branchId?: number) => {
+    const items = await this.prisma.masterItem.findMany({
+      where: {
+        id: { in: ids },
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        itemBranches: {
+          where: {
+            deletedAt: null,
+            ...(branchId ? { branchId } : {}),
+          },
+          select: {
+            branchId: true,
+            recordedStock: true,
+          },
+        },
+      },
+    });
+
+    return items.map((item) => {
+      let stock = 0;
+      if (branchId) {
+        const branch = item.itemBranches.find((ib) => ib.branchId === branchId);
+        stock = branch?.recordedStock ?? 0;
+      } else {
+        stock = item.itemBranches.reduce(
+          (total, ib) => total + ib.recordedStock,
+          0,
+        );
+      }
+
+      return {
+        id: item.id,
+        code: item.code,
+        name: item.name,
+        recordedStock: stock,
+      };
+    });
+  };
 }

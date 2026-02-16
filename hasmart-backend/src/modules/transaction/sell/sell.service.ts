@@ -11,6 +11,7 @@ import {
 } from ".prisma/client";
 import { BranchQueryType } from "src/middleware/use-branch";
 import { Decimal } from "@prisma/client/runtime/library";
+import { RecordLedgerStockService } from "../record-ledger-stock/record-ledger-stock.service";
 
 interface CalculatedDiscount {
   percentage: Decimal;
@@ -36,6 +37,7 @@ export class SellService extends BaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly refreshStockService: RefreshStockService,
+    private readonly recordLedgerStockService: RecordLedgerStockService,
   ) {
     super();
   }
@@ -459,6 +461,21 @@ export class SellService extends BaseService {
       return created;
     });
 
+    // Record ledger stock (before refresh agar recordedStock yang lama tercatat)
+    await this.recordLedgerStockService.recordCommonCreate({
+      parentId: sell.id,
+      userId,
+      branchId: data.branchId,
+      modelType: "TRANSACTION_SELL",
+      transactionDate: data.transactionDate,
+      masterMemberId: memberId || undefined,
+      items: sell.transactionSellItems.map((item) => ({
+        id: item.id,
+        masterItemId: item.masterItemId,
+        totalQty: item.totalQty,
+      })),
+    });
+
     // Refresh stock for all unique items (after transaction)
     const uniqueItemIds = [
       ...new Set(calculatedItems.map((i) => i.masterItemId)),
@@ -574,6 +591,29 @@ export class SellService extends BaseService {
       return updated;
     });
 
+    // Buat map oldTotalQty: masterItemId → totalQty dari items lama (sebelum hard delete)
+    const oldQtyMap = new Map<number, number>();
+    for (const item of existing.transactionSellItems) {
+      const prev = oldQtyMap.get(item.masterItemId) ?? 0;
+      oldQtyMap.set(item.masterItemId, prev + item.totalQty);
+    }
+
+    // Record ledger stock update (sebelum refresh agar recordedStock lama terrecord)
+    await this.recordLedgerStockService.recordCommonUpdate({
+      parentId: sell.id,
+      userId,
+      branchId: data.branchId,
+      modelType: "TRANSACTION_SELL",
+      transactionDate: data.transactionDate,
+      masterMemberId: memberId || undefined,
+      items: sell.transactionSellItems.map((item) => ({
+        id: item.id,
+        masterItemId: item.masterItemId,
+        totalQty: item.totalQty,
+        oldTotalQty: oldQtyMap.get(item.masterItemId) ?? 0,
+      })),
+    });
+
     // Refresh stock for all affected items (old + new)
     const newItemIds = calculatedItems.map((i) => i.masterItemId);
     const allItemIds = [...new Set([...oldItemIds, ...newItemIds])];
@@ -624,6 +664,13 @@ export class SellService extends BaseService {
       });
 
       return result;
+    });
+
+    // Record ledger stock delete (setelah sebelum refresh agar recordedStock lama terrecord)
+    await this.recordLedgerStockService.recordCommonDelete({
+      parentId: id,
+      modelType: "TRANSACTION_SELL",
+      userId,
     });
 
     // Refresh stock for all items

@@ -16,6 +16,7 @@ import {
 import { RefreshBuyPriceService } from "../refresh-buy-price/refresh-buy-price.service";
 import { BranchQueryType } from "src/middleware/use-branch";
 import { Decimal } from "@prisma/client/runtime/library";
+import { RecordLedgerStockService } from "../record-ledger-stock/record-ledger-stock.service";
 
 interface CalculatedDiscount {
   percentage: Decimal;
@@ -42,6 +43,7 @@ export class PurchaseService extends BaseService {
     private readonly prisma: PrismaService,
     private readonly refreshStockService: RefreshStockService,
     private readonly refreshBuyPriceService: RefreshBuyPriceService,
+    private readonly recordLedgerStockService: RecordLedgerStockService,
   ) {
     super();
   }
@@ -55,17 +57,17 @@ export class PurchaseService extends BaseService {
       branchId: branchQuery?.branchId,
       OR: filter?.search
         ? [
-          { invoiceNumber: { contains: filter.search, mode: "insensitive" } },
-          { notes: { contains: filter.search, mode: "insensitive" } },
-          {
-            masterSupplier: {
-              OR: [
-                { name: { contains: filter.search, mode: "insensitive" } },
-                { code: { contains: filter.search, mode: "insensitive" } },
-              ],
+            { invoiceNumber: { contains: filter.search, mode: "insensitive" } },
+            { notes: { contains: filter.search, mode: "insensitive" } },
+            {
+              masterSupplier: {
+                OR: [
+                  { name: { contains: filter.search, mode: "insensitive" } },
+                  { code: { contains: filter.search, mode: "insensitive" } },
+                ],
+              },
             },
-          },
-        ]
+          ]
         : undefined,
     };
     if (filter?.dateStart || filter?.dateEnd) {
@@ -440,6 +442,21 @@ export class PurchaseService extends BaseService {
       return created;
     });
 
+    // Record ledger stock (before refresh agar recordedStock yang lama tercatat)
+    await this.recordLedgerStockService.recordCommonCreate({
+      parentId: purchase.id,
+      userId,
+      branchId: data.branchId,
+      modelType: "TRANSACTION_PURCHASE",
+      transactionDate: data.transactionDate,
+      masterSupplierId: supplierId,
+      items: purchase.transactionPurchaseItems.map((item) => ({
+        id: item.id,
+        masterItemId: item.masterItemId,
+        totalQty: item.totalQty,
+      })),
+    });
+
     // Refresh stock for all unique items (after transaction)
     const uniqueItemIds = [
       ...new Set(calculatedItems.map((i) => i.masterItemId)),
@@ -582,6 +599,29 @@ export class PurchaseService extends BaseService {
       return updated;
     });
 
+    // Buat map oldTotalQty: masterItemId → totalQty dari items lama (sebelum hard delete)
+    const oldQtyMap = new Map<number, number>();
+    for (const item of existing.transactionPurchaseItems) {
+      const prev = oldQtyMap.get(item.masterItemId) ?? 0;
+      oldQtyMap.set(item.masterItemId, prev + item.totalQty);
+    }
+
+    // Record ledger stock update (sebelum refresh agar recordedStock lama terrecord)
+    await this.recordLedgerStockService.recordCommonUpdate({
+      parentId: purchase.id,
+      userId,
+      branchId: data.branchId,
+      modelType: "TRANSACTION_PURCHASE",
+      transactionDate: data.transactionDate,
+      masterSupplierId: supplierId,
+      items: purchase.transactionPurchaseItems.map((item) => ({
+        id: item.id,
+        masterItemId: item.masterItemId,
+        totalQty: item.totalQty,
+        oldTotalQty: oldQtyMap.get(item.masterItemId) ?? 0,
+      })),
+    });
+
     // Refresh stock for all affected items (old + new)
     const newItemIds = calculatedItems.map((i) => i.masterItemId);
     const allItemIds = [...new Set([...oldItemIds, ...newItemIds])];
@@ -670,6 +710,13 @@ export class PurchaseService extends BaseService {
       });
 
       return result;
+    });
+
+    // Record ledger stock delete (setelah sebelum refresh agar recordedStock lama terrecord)
+    await this.recordLedgerStockService.recordCommonDelete({
+      parentId: id,
+      modelType: "TRANSACTION_PURCHASE",
+      userId,
     });
 
     // 3. LOGIKA REFRESH (Stock & Price)
