@@ -20,7 +20,7 @@ export class LedgerStockRouter extends BaseRouter {
     this.router.get(
       "/",
       useAuth(this.jwtService),
-      useFilter(["transactionDate"], true), // isTransaction = true agar default sortBy = transactionDate
+      useFilter(["transactionDate"]),
       validateHandler({ query: LedgerStockQuerySchema }),
       asyncHandler(
         async (req, res) => await this.controller.getAllLedgerStock(req, res),

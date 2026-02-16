@@ -496,6 +496,7 @@ export default function PurchaseReturnPage() {
                     toast.success("Retur pembelian berhasil dibuat");
                 },
                 onError: (err) => {
+                    console.log(err);
                     const error = err as AxiosError<{ errors?: { message?: string }, message?: string }>;
                     toast.error(error.response?.data?.errors?.message || error.response?.data?.message || "Gagal membuat retur pembelian");
                 }

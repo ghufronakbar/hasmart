@@ -8,13 +8,20 @@ import {
     PaginationState,
     SortingState,
 } from "@tanstack/react-table";
-import { Loader2, X } from "lucide-react";
+import { Loader2, X, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 
 
 import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
 import {
     Select,
     SelectContent,
@@ -85,13 +92,16 @@ export default function LedgerStockPage() {
     const { branch, isLoading: isBranchLoading } = useBranch();
     const router = useRouter();
 
+    // --- Detail Dialog State ---
+    const [selectedItem, setSelectedItem] = useState<LedgerStockItem | null>(null);
+
     // --- Filter States ---
     const [pagination, setPagination] = useState<PaginationState>({
         pageIndex: 0,
         pageSize: 10,
     });
     const [sorting, setSorting] = useState<SortingState>([
-        { id: "transactionDate", desc: true },
+        { id: "createdAt", desc: true },
     ]);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
@@ -220,6 +230,17 @@ export default function LedgerStockPage() {
             cell: ({ row }) =>
                 format(new Date(row.getValue("createdAt")), "dd MMM yyyy HH:mm", { locale: idLocale }),
         },
+        {
+            id: "actions",
+            header: () => <div className="text-right">Aksi</div>,
+            cell: ({ row }) => (
+                <div className="flex justify-end">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setSelectedItem(row.original)}>
+                        <Eye className="h-4 w-4" />
+                    </Button>
+                </div>
+            ),
+        },
     ], []);
 
     const table = useReactTable({
@@ -343,6 +364,96 @@ export default function LedgerStockPage() {
                 isLoading={isLoading}
                 showSelectedRowCount={false}
             />
+
+            {/* Detail Dialog */}
+            <LedgerStockDetailDialog
+                open={!!selectedItem}
+                onOpenChange={(open) => !open && setSelectedItem(null)}
+                item={selectedItem}
+            />
         </div>
+    );
+}
+
+// --- Detail Dialog ---
+function LedgerStockDetailDialog({
+    open,
+    onOpenChange,
+    item,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    item: LedgerStockItem | null;
+}) {
+    if (!item) return null;
+
+    const gapAmount = item.gapAmount;
+    const isPositive = gapAmount > 0;
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Detail Transaksi Stok</DialogTitle>
+                </DialogHeader>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <span className="text-muted-foreground block">Tanggal Transaksi</span>
+                        <span className="font-medium">
+                            {format(new Date(item.transactionDate), "dd MMMM yyyy HH:mm", { locale: idLocale })}
+                        </span>
+                    </div>
+                    <div>
+                        <span className="text-muted-foreground block">Tanggal Dibuat</span>
+                        <span className="font-medium">
+                            {format(new Date(item.createdAt), "dd MMMM yyyy HH:mm", { locale: idLocale })}
+                        </span>
+                    </div>
+                    <div>
+                        <span className="text-muted-foreground block">Barang</span>
+                        <span className="font-medium">{item.masterItem?.name || "-"}</span>
+                    </div>
+                    <div>
+                        <span className="text-muted-foreground block">Oleh</span>
+                        <span className="font-medium">{item.user?.name || "-"}</span>
+                    </div>
+                    <div>
+                        <span className="text-muted-foreground block">Tipe Transaksi</span>
+                        <Badge variant="secondary" className={`text-xs ${MODEL_TYPE_COLORS[item.modelType] || ""}`}>
+                            {MODEL_TYPE_LABELS[item.modelType] || item.modelType}
+                        </Badge>
+                    </div>
+                    <div>
+                        <span className="text-muted-foreground block">Aksi</span>
+                        <Badge variant="secondary" className={`text-xs ${ACTION_TYPE_COLORS[item.actionType] || ""}`}>
+                            {ACTION_TYPE_LABELS[item.actionType] || item.actionType}
+                        </Badge>
+                    </div>
+                    <div>
+                        <span className="text-muted-foreground block">Perubahan Stok</span>
+                        <span className={`font-bold ${isPositive ? "text-green-600" : gapAmount < 0 ? "text-red-600" : ""}`}>
+                            {isPositive ? `+${gapAmount}` : gapAmount}
+                        </span>
+                    </div>
+                    <div>
+                        <span className="text-muted-foreground block">Stok Setelah</span>
+                        <span className="font-medium">{item.recordedStockAfterAmount}</span>
+                    </div>
+                    <div className="col-span-2">
+                        <span className="text-muted-foreground block">Referensi Invoice</span>
+                        <span className="font-medium">{item.invoiceNumberReff || "-"}</span>
+                    </div>
+                    <div className="col-span-2">
+                        <span className="text-muted-foreground block">Keterangan</span>
+                        <span className="font-medium whitespace-pre-wrap">{item.additionalNote || "-"}</span>
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button onClick={() => onOpenChange(false)}>Tutup</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }

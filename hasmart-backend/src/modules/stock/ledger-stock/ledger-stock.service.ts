@@ -35,8 +35,8 @@ export class LedgerStockService extends BaseService {
     if (params.branchId) {
       where.OR = [
         { branchId: params.branchId },
-        { fromBranchId: params.branchId },
-        { toBranchId: params.branchId },
+        // { fromBranchId: params.branchId },
+        // { toBranchId: params.branchId },
       ];
     }
 
