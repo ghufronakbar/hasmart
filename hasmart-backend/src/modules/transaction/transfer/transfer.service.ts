@@ -10,6 +10,7 @@ import {
   RecordActionType,
 } from ".prisma/client";
 import { BranchQueryType } from "src/middleware/use-branch";
+import { RecordLedgerStockService } from "../record-ledger-stock/record-ledger-stock.service";
 
 interface CalculatedItem {
   masterItemId: number;
@@ -23,6 +24,7 @@ export class TransferService extends BaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly refreshStockService: RefreshStockService,
+    private readonly recordLedgerStockSvc: RecordLedgerStockService,
   ) {
     super();
   }
@@ -270,6 +272,22 @@ export class TransferService extends BaseService {
           userId,
         },
       });
+
+      await this.recordLedgerStockSvc.recordTransferCreate(
+        {
+          branchId: data.fromId,
+          userId,
+          parentId: created.id,
+          toBranchId: data.toId,
+          transactionDate: data.transactionDate,
+          items: created.transactionTransferItems.map((item) => ({
+            id: item.id,
+            masterItemId: item.masterItemId,
+            totalQty: item.totalQty,
+          })),
+        },
+        tx,
+      );
 
       return created;
     });

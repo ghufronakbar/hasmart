@@ -13,6 +13,7 @@ import {
   RecordCommonPayloadCreate,
   RecordCommonPayloadDelete,
   RecordCommonPayloadUpdate,
+  RecordTransferPayloadCreate,
 } from "./record-ledger-stock.interface";
 import { BadRequestError } from "../../../utils/error";
 import { ItemService } from "../../master/item/item.service";
@@ -520,5 +521,83 @@ export class RecordLedgerStockService extends BaseService {
         gapAmount: -adjustmentData.totalGapAmount, // kebalikan dari create
       },
     });
+  };
+
+  recordTransferCreate = async (
+    payload: RecordTransferPayloadCreate,
+    tx: Omit<
+      PrismaClient<Prisma.PrismaClientOptions, never, DefaultArgs>,
+      "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+    >,
+  ) => {
+    const { parentId, branchId, transactionDate, toBranchId, items, userId } =
+      payload;
+    // OUT
+    const itemStocksFromOut = await this.itemSvc.getItemStockByIds(
+      items.map((item) => item.masterItemId),
+      branchId,
+    );
+    await Promise.all(
+      items.map(async (item) => {
+        const itemStock = itemStocksFromOut.find(
+          (itemStock) => itemStock.id === item.masterItemId,
+        );
+        if (!itemStock) {
+          this.warn(`Item stock not found for item ${item.masterItemId}`);
+        }
+        await tx.ledgerStock.create({
+          data: {
+            modelId: item.id,
+            parentId: parentId,
+            actionType: LedgerStockActionType.CREATE,
+            modelType: LedgerStockModelType.TRANSACTION_TRANSFER_OUT,
+            branchId,
+            userId,
+            transactionDate,
+            toBranchId,
+            beforeDataAmount: 0, // karena create
+            gapAmount: -item.totalQty,
+            recordedStockAfterAmount:
+              (itemStock?.recordedStock || 0) - item.totalQty,
+            recordedStockBeforeAmount: itemStock?.recordedStock || 0, // catat stock sebelum transfer
+            masterItemId: item.masterItemId,
+          },
+        });
+      }),
+    );
+
+    // IN
+    const itemStocksFromIn = await this.itemSvc.getItemStockByIds(
+      items.map((item) => item.masterItemId),
+      toBranchId,
+    );
+    await Promise.all(
+      items.map(async (item) => {
+        const itemStock = itemStocksFromIn.find(
+          (itemStock) => itemStock.id === item.masterItemId,
+        );
+        if (!itemStock) {
+          this.warn(`Item stock not found for item ${item.masterItemId}`);
+        }
+        // tidak perlu to branch (karena sebagai penerima)
+        await tx.ledgerStock.create({
+          data: {
+            modelId: item.id,
+            parentId: parentId,
+            actionType: LedgerStockActionType.CREATE,
+            modelType: LedgerStockModelType.TRANSACTION_TRANSFER_IN,
+            branchId: toBranchId,
+            userId,
+            transactionDate,
+            beforeDataAmount: 0, // karena create
+            gapAmount: item.totalQty,
+            recordedStockAfterAmount:
+              (itemStock?.recordedStock || 0) + item.totalQty,
+            recordedStockBeforeAmount: itemStock?.recordedStock || 0, // catat stock sebelum transfer
+            masterItemId: item.masterItemId,
+          },
+        });
+      }),
+    );
   };
 }

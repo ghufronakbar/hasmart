@@ -64,3 +64,17 @@ export interface RecordAdjustmentPayloadDelete {
   modelId: number;
   branchId: number;
 }
+
+// TRANSFER
+export interface RecordTransferPayloadCreate {
+  parentId: number;
+  userId: number;
+  branchId: number;
+  transactionDate: Date;
+  toBranchId: number;
+  items: {
+    id: number;
+    masterItemId: number;
+    totalQty: number;
+  }[];
+}
