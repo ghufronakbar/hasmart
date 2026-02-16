@@ -367,22 +367,25 @@ export class PurchaseReturnService extends BaseService {
         },
       });
 
-      return created;
-    });
+      // Record ledger stock (before refresh agar recordedStock yang lama tercatat)
+      await this.recordLedgerStockService.recordCommonCreate(
+        {
+          parentId: created.id,
+          userId,
+          branchId: data.branchId,
+          modelType: "TRANSACTION_PURCHASE_RETURN",
+          transactionDate: data.transactionDate,
+          masterSupplierId: data.masterSupplierId,
+          items: created.transactionPurchaseReturnItems.map((item) => ({
+            id: item.id,
+            masterItemId: item.masterItemId,
+            totalQty: item.totalQty,
+          })),
+        },
+        tx,
+      );
 
-    // Record ledger stock (before refresh agar recordedStock yang lama tercatat)
-    await this.recordLedgerStockService.recordCommonCreate({
-      parentId: purchaseReturn.id,
-      userId,
-      branchId: data.branchId,
-      modelType: "TRANSACTION_PURCHASE_RETURN",
-      transactionDate: data.transactionDate,
-      masterSupplierId: data.masterSupplierId,
-      items: purchaseReturn.transactionPurchaseReturnItems.map((item) => ({
-        id: item.id,
-        masterItemId: item.masterItemId,
-        totalQty: item.totalQty,
-      })),
+      return created;
     });
 
     // Refresh stock for all unique items (after transaction)
@@ -514,30 +517,33 @@ export class PurchaseReturnService extends BaseService {
         },
       });
 
+      // Buat map oldTotalQty: masterItemId → totalQty dari items lama (sebelum hard delete)
+      const oldQtyMap = new Map<number, number>();
+      for (const item of existing.transactionPurchaseReturnItems) {
+        const prev = oldQtyMap.get(item.masterItemId) ?? 0;
+        oldQtyMap.set(item.masterItemId, prev + item.totalQty);
+      }
+
+      // Record ledger stock update (sebelum refresh agar recordedStock lama terrecord)
+      await this.recordLedgerStockService.recordCommonUpdate(
+        {
+          parentId: updated.id,
+          userId,
+          branchId: data.branchId,
+          modelType: "TRANSACTION_PURCHASE_RETURN",
+          transactionDate: data.transactionDate,
+          masterSupplierId: data.masterSupplierId,
+          items: updated.transactionPurchaseReturnItems.map((item) => ({
+            id: item.id,
+            masterItemId: item.masterItemId,
+            totalQty: item.totalQty,
+            oldTotalQty: oldQtyMap.get(item.masterItemId) ?? 0,
+          })),
+        },
+        tx,
+      );
+
       return updated;
-    });
-
-    // Buat map oldTotalQty: masterItemId → totalQty dari items lama (sebelum hard delete)
-    const oldQtyMap = new Map<number, number>();
-    for (const item of existing.transactionPurchaseReturnItems) {
-      const prev = oldQtyMap.get(item.masterItemId) ?? 0;
-      oldQtyMap.set(item.masterItemId, prev + item.totalQty);
-    }
-
-    // Record ledger stock update (sebelum refresh agar recordedStock lama terrecord)
-    await this.recordLedgerStockService.recordCommonUpdate({
-      parentId: purchaseReturn.id,
-      userId,
-      branchId: data.branchId,
-      modelType: "TRANSACTION_PURCHASE_RETURN",
-      transactionDate: data.transactionDate,
-      masterSupplierId: data.masterSupplierId,
-      items: purchaseReturn.transactionPurchaseReturnItems.map((item) => ({
-        id: item.id,
-        masterItemId: item.masterItemId,
-        totalQty: item.totalQty,
-        oldTotalQty: oldQtyMap.get(item.masterItemId) ?? 0,
-      })),
     });
 
     // Refresh stock for all affected items (old + new)
@@ -617,14 +623,17 @@ export class PurchaseReturnService extends BaseService {
         },
       });
 
-      return result;
-    });
+      // Record ledger stock delete (setelah sebelum refresh agar recordedStock lama terrecord)
+      await this.recordLedgerStockService.recordCommonDelete(
+        {
+          parentId: id,
+          modelType: "TRANSACTION_PURCHASE_RETURN",
+          userId,
+        },
+        tx,
+      );
 
-    // Record ledger stock delete (setelah sebelum refresh agar recordedStock lama terrecord)
-    await this.recordLedgerStockService.recordCommonDelete({
-      parentId: id,
-      modelType: "TRANSACTION_PURCHASE_RETURN",
-      userId,
+      return result;
     });
 
     // Refresh stock for all items

@@ -1,4 +1,10 @@
-import { LedgerStockModelType } from ".prisma/client";
+import { LedgerStockModelType, Prisma, PrismaClient } from ".prisma/client";
+import { DefaultArgs } from "@prisma/client/runtime/library";
+
+export type PrismaTx = Omit<
+  PrismaClient<Prisma.PrismaClientOptions, never, DefaultArgs>,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>;
 
 // COMMON
 export type CommonRecordModel = Exclude<
@@ -77,4 +83,9 @@ export interface RecordTransferPayloadCreate {
     masterItemId: number;
     totalQty: number;
   }[];
+}
+
+export interface RecordTransferPayloadDelete {
+  parentId: number;
+  userId: number;
 }

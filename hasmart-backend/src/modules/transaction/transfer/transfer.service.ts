@@ -435,6 +435,14 @@ export class TransferService extends BaseService {
         },
       });
 
+      await this.recordLedgerStockSvc.recordTransferDelete(
+        {
+          userId,
+          parentId: existing.id,
+        },
+        tx,
+      );
+
       return result;
     });
 

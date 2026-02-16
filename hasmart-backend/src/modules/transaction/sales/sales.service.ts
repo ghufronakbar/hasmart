@@ -471,22 +471,25 @@ export class SalesService extends BaseService {
         },
       });
 
-      return created;
-    });
+      // Record ledger stock (before refresh agar recordedStock yang lama tercatat)
+      await this.recordLedgerStockService.recordCommonCreate(
+        {
+          parentId: created.id,
+          userId,
+          branchId: data.branchId,
+          modelType: "TRANSACTION_SALES",
+          transactionDate: new Date(),
+          masterMemberId: memberId || undefined,
+          items: created.transactionSalesItems.map((item) => ({
+            id: item.id,
+            masterItemId: item.masterItemId,
+            totalQty: item.totalQty,
+          })),
+        },
+        tx,
+      );
 
-    // Record ledger stock (before refresh agar recordedStock yang lama tercatat)
-    await this.recordLedgerStockService.recordCommonCreate({
-      parentId: sales.id,
-      userId,
-      branchId: data.branchId,
-      modelType: "TRANSACTION_SALES",
-      transactionDate: new Date(),
-      masterMemberId: memberId || undefined,
-      items: sales.transactionSalesItems.map((item) => ({
-        id: item.id,
-        masterItemId: item.masterItemId,
-        totalQty: item.totalQty,
-      })),
+      return created;
     });
 
     // Refresh stock for all unique items (after transaction)
@@ -607,30 +610,33 @@ export class SalesService extends BaseService {
         },
       });
 
+      // Buat map oldTotalQty: masterItemId → totalQty dari items lama (sebelum hard delete)
+      const oldQtyMap = new Map<number, number>();
+      for (const item of existing.transactionSalesItems) {
+        const prev = oldQtyMap.get(item.masterItemId) ?? 0;
+        oldQtyMap.set(item.masterItemId, prev + item.totalQty);
+      }
+
+      // Record ledger stock update (sebelum refresh agar recordedStock lama terrecord)
+      await this.recordLedgerStockService.recordCommonUpdate(
+        {
+          parentId: updated.id,
+          userId,
+          branchId: data.branchId,
+          modelType: "TRANSACTION_SALES",
+          transactionDate: updated.transactionDate,
+          masterMemberId: memberId || undefined,
+          items: updated.transactionSalesItems.map((item) => ({
+            id: item.id,
+            masterItemId: item.masterItemId,
+            totalQty: item.totalQty,
+            oldTotalQty: oldQtyMap.get(item.masterItemId) ?? 0,
+          })),
+        },
+        tx,
+      );
+
       return updated;
-    });
-
-    // Buat map oldTotalQty: masterItemId → totalQty dari items lama (sebelum hard delete)
-    const oldQtyMap = new Map<number, number>();
-    for (const item of existing.transactionSalesItems) {
-      const prev = oldQtyMap.get(item.masterItemId) ?? 0;
-      oldQtyMap.set(item.masterItemId, prev + item.totalQty);
-    }
-
-    // Record ledger stock update (sebelum refresh agar recordedStock lama terrecord)
-    await this.recordLedgerStockService.recordCommonUpdate({
-      parentId: sales.id,
-      userId,
-      branchId: data.branchId,
-      modelType: "TRANSACTION_SALES",
-      transactionDate: existing.transactionDate,
-      masterMemberId: memberId || undefined,
-      items: sales.transactionSalesItems.map((item) => ({
-        id: item.id,
-        masterItemId: item.masterItemId,
-        totalQty: item.totalQty,
-        oldTotalQty: oldQtyMap.get(item.masterItemId) ?? 0,
-      })),
     });
 
     // Refresh stock for all affected items (old + new)
@@ -688,14 +694,17 @@ export class SalesService extends BaseService {
         },
       });
 
-      return result;
-    });
+      // Record ledger stock delete (setelah sebelum refresh agar recordedStock lama terrecord)
+      await this.recordLedgerStockService.recordCommonDelete(
+        {
+          parentId: id,
+          modelType: "TRANSACTION_SALES",
+          userId,
+        },
+        tx,
+      );
 
-    // Record ledger stock delete (setelah sebelum refresh agar recordedStock lama terrecord)
-    await this.recordLedgerStockService.recordCommonDelete({
-      parentId: id,
-      modelType: "TRANSACTION_SALES",
-      userId,
+      return result;
     });
 
     // Refresh stock for all items

@@ -1,23 +1,19 @@
-import {
-  LedgerStockActionType,
-  LedgerStockModelType,
-  Prisma,
-  PrismaClient,
-} from ".prisma/client";
+import { LedgerStockActionType, LedgerStockModelType } from ".prisma/client";
 import { BaseService } from "../../../base/base-service";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import {
   CommonRecordModel,
+  PrismaTx,
   RecordAdjustmentPayloadCreate,
   RecordAdjustmentPayloadDelete,
   RecordCommonPayloadCreate,
   RecordCommonPayloadDelete,
   RecordCommonPayloadUpdate,
   RecordTransferPayloadCreate,
+  RecordTransferPayloadDelete,
 } from "./record-ledger-stock.interface";
 import { BadRequestError } from "../../../utils/error";
 import { ItemService } from "../../master/item/item.service";
-import { DefaultArgs } from "@prisma/client/runtime/library";
 
 /**
  * Konfigurasi arah stok per tipe transaksi:
@@ -86,7 +82,10 @@ export class RecordLedgerStockService extends BaseService {
    * - recordedStockBeforeAmount = stok saat ini di branch sebelum perubahan
    * - recordedStockAfterAmount = stok setelah perubahan (before + gap)
    */
-  recordCommonCreate = async (payload: RecordCommonPayloadCreate) => {
+  recordCommonCreate = async (
+    payload: RecordCommonPayloadCreate,
+    tx: PrismaTx,
+  ) => {
     const {
       parentId,
       userId,
@@ -127,7 +126,7 @@ export class RecordLedgerStockService extends BaseService {
       // gapAmount = totalQty * direction (positif/negatif sesuai tipe transaksi)
       const gapAmount = txItem.totalQty * config.stockDirection;
 
-      return this.prisma.ledgerStock.create({
+      return tx.ledgerStock.create({
         data: {
           parentId,
           actionType: LedgerStockActionType.CREATE,
@@ -161,7 +160,10 @@ export class RecordLedgerStockService extends BaseService {
    *   Contoh sales:    oldTotalQty=10, totalQty=15 → gap = (15-10) * -1 = -5
    * - beforeDataAmount = oldTotalQty (qty data lama, untuk audit trail)
    */
-  recordCommonUpdate = async (payload: RecordCommonPayloadUpdate) => {
+  recordCommonUpdate = async (
+    payload: RecordCommonPayloadUpdate,
+    tx: PrismaTx,
+  ) => {
     const {
       parentId,
       userId,
@@ -204,7 +206,7 @@ export class RecordLedgerStockService extends BaseService {
       const gapAmount =
         (txItem.totalQty - txItem.oldTotalQty) * config.stockDirection;
 
-      return this.prisma.ledgerStock.create({
+      return tx.ledgerStock.create({
         data: {
           parentId,
           actionType: LedgerStockActionType.UPDATE,
@@ -237,7 +239,10 @@ export class RecordLedgerStockService extends BaseService {
    * - beforeDataAmount = totalQty item sebelum dihapus (untuk audit trail)
    * - gapAmount = kebalikan dari create (direction * -1)
    */
-  recordCommonDelete = async (payload: RecordCommonPayloadDelete) => {
+  recordCommonDelete = async (
+    payload: RecordCommonPayloadDelete,
+    tx: PrismaTx,
+  ) => {
     const { parentId, modelType, userId } = payload;
     const config = STOCK_CONFIG[modelType];
 
@@ -277,7 +282,7 @@ export class RecordLedgerStockService extends BaseService {
       // gapAmount = totalQty * deleteDirection (kebalikan dari create)
       const gapAmount = txItem.totalQty * deleteDirection;
 
-      return this.prisma.ledgerStock.create({
+      return tx.ledgerStock.create({
         data: {
           parentId,
           actionType: LedgerStockActionType.DELETE,
@@ -445,10 +450,7 @@ export class RecordLedgerStockService extends BaseService {
 
   recordAdjustmentCreate = async (
     payload: RecordAdjustmentPayloadCreate,
-    tx: Omit<
-      PrismaClient<Prisma.PrismaClientOptions, never, DefaultArgs>,
-      "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
-    >,
+    tx: PrismaTx,
   ) => {
     const {
       modelId,
@@ -480,10 +482,7 @@ export class RecordLedgerStockService extends BaseService {
 
   recordAdjustmentDelete = async (
     payload: RecordAdjustmentPayloadDelete,
-    tx: Omit<
-      PrismaClient<Prisma.PrismaClientOptions, never, DefaultArgs>,
-      "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
-    >,
+    tx: PrismaTx,
   ) => {
     const { branchId, modelId, userId } = payload;
     const adjustmentData = await tx.transactionAdjustment.findUnique({
@@ -525,10 +524,7 @@ export class RecordLedgerStockService extends BaseService {
 
   recordTransferCreate = async (
     payload: RecordTransferPayloadCreate,
-    tx: Omit<
-      PrismaClient<Prisma.PrismaClientOptions, never, DefaultArgs>,
-      "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
-    >,
+    tx: PrismaTx,
   ) => {
     const { parentId, branchId, transactionDate, toBranchId, items, userId } =
       payload;
@@ -594,6 +590,98 @@ export class RecordLedgerStockService extends BaseService {
             recordedStockAfterAmount:
               (itemStock?.recordedStock || 0) + item.totalQty,
             recordedStockBeforeAmount: itemStock?.recordedStock || 0, // catat stock sebelum transfer
+            masterItemId: item.masterItemId,
+          },
+        });
+      }),
+    );
+  };
+
+  recordTransferDelete = async (
+    payload: RecordTransferPayloadDelete,
+    tx: PrismaTx,
+  ) => {
+    const { parentId, userId } = payload;
+    const transferData = await tx.transactionTransfer.findUnique({
+      where: { id: parentId },
+      select: {
+        transactionDate: true,
+        fromId: true,
+        toId: true,
+        transactionTransferItems: {
+          select: {
+            id: true,
+            masterItemId: true,
+            totalQty: true,
+          },
+        },
+      },
+    });
+    if (!transferData) {
+      throw new BadRequestError("Transfer data not found");
+    }
+    const itemStockFromOut = await this.itemSvc.getItemStockByIds(
+      transferData.transactionTransferItems.map((item) => item.masterItemId),
+      transferData.fromId,
+    );
+    const itemStockFromIn = await this.itemSvc.getItemStockByIds(
+      transferData.transactionTransferItems.map((item) => item.masterItemId),
+      transferData.toId,
+    );
+
+    // OUT
+    await Promise.all(
+      transferData.transactionTransferItems.map(async (item) => {
+        const itemStock = itemStockFromOut.find(
+          (itemStock) => itemStock.id === item.masterItemId,
+        );
+        if (!itemStock) {
+          this.warn(`Item stock not found for item ${item.masterItemId}`);
+        }
+        await tx.ledgerStock.create({
+          data: {
+            modelId: item.id,
+            parentId: parentId,
+            actionType: LedgerStockActionType.DELETE,
+            modelType: LedgerStockModelType.TRANSACTION_TRANSFER_OUT,
+            branchId: transferData.fromId,
+            userId,
+            transactionDate: transferData.transactionDate,
+            toBranchId: transferData.toId,
+            beforeDataAmount: item.totalQty, // cek data lama
+            gapAmount: item.totalQty, // kebalikan, karena dikembalikan ke branch from
+            recordedStockAfterAmount:
+              (itemStock?.recordedStock || 0) + item.totalQty,
+            recordedStockBeforeAmount: itemStock?.recordedStock || 0, // catat stock sebelum dibatalkan
+            masterItemId: item.masterItemId,
+          },
+        });
+      }),
+    );
+
+    // IN
+    await Promise.all(
+      transferData.transactionTransferItems.map(async (item) => {
+        const itemStock = itemStockFromIn.find(
+          (itemStock) => itemStock.id === item.masterItemId,
+        );
+        if (!itemStock) {
+          this.warn(`Item stock not found for item ${item.masterItemId}`);
+        }
+        await tx.ledgerStock.create({
+          data: {
+            modelId: item.id,
+            parentId: parentId,
+            actionType: LedgerStockActionType.DELETE,
+            modelType: LedgerStockModelType.TRANSACTION_TRANSFER_IN,
+            branchId: transferData.toId,
+            userId,
+            transactionDate: transferData.transactionDate,
+            beforeDataAmount: item.totalQty, // cek data lama
+            gapAmount: -item.totalQty, // kebalikan, karena dikembalikan ke branch from
+            recordedStockAfterAmount:
+              (itemStock?.recordedStock || 0) - item.totalQty,
+            recordedStockBeforeAmount: itemStock?.recordedStock || 0, // catat stock sebelum dibatalkan
             masterItemId: item.masterItemId,
           },
         });
