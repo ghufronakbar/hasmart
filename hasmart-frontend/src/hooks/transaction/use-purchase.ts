@@ -62,6 +62,12 @@ export function useCreatePurchase() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.stock.frontStock.items.list(),
       });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.list(),
+      });
     },
   });
 }
@@ -98,6 +104,12 @@ export function useUpdatePurchase() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.stock.frontStock.items.list(),
       });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.list(),
+      });
     },
   });
 }
@@ -124,6 +136,12 @@ export function useDeletePurchase() {
       });
       queryClient.invalidateQueries({
         queryKey: queryKeys.stock.frontStock.items.list(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.list(),
       });
     },
   });

@@ -62,6 +62,13 @@ export function useCreateSell() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.stock.frontStock.items.list(),
       });
+
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.list(),
+      });
     },
   });
 }
@@ -93,6 +100,13 @@ export function useUpdateSell() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.stock.frontStock.items.list(),
       });
+
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.list(),
+      });
     },
   });
 }
@@ -119,6 +133,13 @@ export function useDeleteSell() {
       });
       queryClient.invalidateQueries({
         queryKey: queryKeys.stock.frontStock.items.list(),
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.list(),
       });
     },
   });

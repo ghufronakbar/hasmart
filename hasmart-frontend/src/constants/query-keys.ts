@@ -193,6 +193,11 @@ export const queryKeys = {
           [...queryKeys.stock.frontStock.transfers.all, "detail", id] as const,
       },
     },
+    ledgerStock: {
+      all: ["stock", "ledger-stock"] as const,
+      list: (params?: unknown) =>
+        [...queryKeys.stock.ledgerStock.all, "list", params] as const,
+    },
   },
 };
 
@@ -226,5 +231,6 @@ export const invalidationMap = {
       items: () => [queryKeys.stock.frontStock.items.all],
       transfers: () => [queryKeys.stock.frontStock.transfers.all],
     },
+    ledgerStock: () => [queryKeys.stock.ledgerStock.all],
   },
 };

@@ -8,19 +8,6 @@ export const LedgerStockQuerySchema = z.object({
   masterItemId: z.coerce.number().optional(), // untuk filter jika ada
   masterMemberId: z.coerce.number().optional(), // untuk filter jika ada
   masterSupplierId: z.coerce.number().optional(), // untuk filter jika ada
-  sort: z
-    .enum(["createdAt", "transactionDate"])
-    .optional()
-    .default("createdAt"),
-  sortBy: z.enum(["asc", "desc"]).optional().default("desc"),
-  dateStart: z.coerce
-    .date()
-    .optional()
-    .default(undefined as unknown as Date),
-  dateEnd: z.coerce
-    .date()
-    .optional()
-    .default(undefined as unknown as Date),
 });
 
 export type LedgerStockQueryType = z.infer<typeof LedgerStockQuerySchema>;

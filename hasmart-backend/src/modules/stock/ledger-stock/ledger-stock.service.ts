@@ -67,11 +67,11 @@ export class LedgerStockService extends BaseService {
 
     // Date range filter (gunakan sort field dari params sebagai target date column)
     const dateField =
-      params.sort === "transactionDate" ? "transactionDate" : "createdAt";
-    if (params.dateStart || params.dateEnd) {
+      filter?.sortBy === "transactionDate" ? "transactionDate" : "createdAt";
+    if (filter?.dateStart || filter?.dateEnd) {
       where[dateField] = {
-        ...(params.dateStart ? { gte: params.dateStart } : {}),
-        ...(params.dateEnd ? { lte: params.dateEnd } : {}),
+        ...(filter?.dateStart ? { gte: filter.dateStart } : {}),
+        ...(filter?.dateEnd ? { lte: filter.dateEnd } : {}),
       };
     }
 
@@ -91,7 +91,7 @@ export class LedgerStockService extends BaseService {
       skip: filter?.skip,
       take: filter?.limit,
       orderBy: {
-        [params.sort]: params.sortBy,
+        [filter?.sortBy || "createdAt"]: filter?.sort || "desc",
       },
       include: {
         masterItem: {

@@ -50,7 +50,7 @@ export const menuItems: MenuItem[] = [
             },
             {
                 title: "Riwayat Transaksi Stok",
-                href: "/dashboard/stock/ledger-item",
+                href: "/dashboard/stock/ledger-stock",
                 access: UserAccess.accessLedgerStockRead,
             }
         ]

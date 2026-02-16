@@ -18,3 +18,6 @@ export * from "./transaction/sales-return.service";
 export * from "./transaction/sell.service";
 export * from "./transaction/sell-return.service";
 export * from "./transaction/transfer.service";
+
+// Stock Services
+export * from "./stock/ledger-stock.service";

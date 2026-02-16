@@ -40,6 +40,12 @@ export function useCreatePurchaseReturn() {
       invalidationMap.transaction.purchaseReturn().forEach((key) => {
         queryClient.invalidateQueries({ queryKey: key });
       });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.list(),
+      });
       // Invalidate stock/item queries as return affects stock
       invalidationMap.master.item().forEach((key) => {
         queryClient.invalidateQueries({ queryKey: key });
@@ -66,6 +72,12 @@ export function useUpdatePurchaseReturn() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.transaction.purchaseReturn.detail(variables.id),
       });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.list(),
+      });
       // Invalidate items for stock refresh
       invalidationMap.master.item().forEach((key) => {
         queryClient.invalidateQueries({ queryKey: key });
@@ -86,6 +98,12 @@ export function useDeletePurchaseReturn() {
       // Invalidate items for stock refresh
       invalidationMap.master.item().forEach((key) => {
         queryClient.invalidateQueries({ queryKey: key });
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.stock.ledgerStock.list(),
       });
     },
   });
