@@ -588,7 +588,7 @@ export default function ItemsPage() {
             <div className="flex items-center justify-between">
                 <div className="flex flex-1 items-center space-x-2">
                     <Input
-                        placeholder="Cari item..."
+                        placeholder="Cari berdasarkan nama, kode, atau kategori..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="h-8 w-[150px] lg:w-[250px]"

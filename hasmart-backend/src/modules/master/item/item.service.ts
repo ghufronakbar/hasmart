@@ -65,9 +65,14 @@ export class ItemService extends BaseService {
           : undefined,
       OR: filter?.search
         ? [
-            { name: { contains: filter.search, mode: "insensitive" } },
-            { code: { contains: filter.search, mode: "insensitive" } },
-          ]
+          { name: { contains: filter.search, mode: "insensitive" } },
+          { code: { contains: filter.search, mode: "insensitive" } },
+          {
+            masterItemCategory: {
+              name: { contains: filter.search, mode: "insensitive" }
+            }
+          },
+        ]
         : undefined,
     };
     if (itemQuery?.onlyActive === true) {
