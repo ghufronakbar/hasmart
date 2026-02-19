@@ -13,7 +13,8 @@
     "seed:purchase": "ts-node --transpile-only ./scripts/seed-purchase.ts",
     "seed:pos": "ts-node --transpile-only ./scripts/seed-point-of-sales.ts",
     "seed:sales": "ts-node --transpile-only ./scripts/seed-sales.ts",
-    "seed:all": "npm run seed:item && npm run seed:purchase && npm run seed:pos && npm run seed:sales"
+    "seed:ledger": "ts-node --transpile-only ./scripts/seed-ledger.ts",
+    "seed:all": "npm run seed:item && npm run seed:purchase && npm run seed:pos && npm run seed:sales && npm run seed:ledger"
   },
   "keywords": [],
   "author": "",

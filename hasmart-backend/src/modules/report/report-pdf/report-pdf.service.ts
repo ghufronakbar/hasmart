@@ -1285,8 +1285,19 @@ export class ReportPdfService extends BaseService {
       },
     });
 
+    // Calculate dynamic page width based on number of columns
+    const fixedColumnCount = 9; // Tanggal + 8 fixed columns
+    const totalColumnCount = fixedColumnCount + userNames.length;
+    const columnWidth = 75; // estimated width per column in points
+    const margin = 40 * 2; // left + right margins
+    const minWidth = 841.89; // A4 landscape width
+    const calculatedWidth = totalColumnCount * columnWidth + margin;
+    const pageWidth = Math.max(minWidth, calculatedWidth);
+    const pageHeight = 595.28; // A4 landscape height
+
     const docDefinition: TDocumentDefinitions = {
       pageOrientation: "landscape",
+      pageSize: { width: pageWidth, height: pageHeight },
       content: content,
       styles: ReportHelper.getStyles(),
       defaultStyle: { fontSize: 8 },
