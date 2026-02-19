@@ -73,13 +73,13 @@ async function ledgerSeed() {
   const ledgers = await prisma.ledgerStock.findMany();
   const existPurchaseIds = ledgers
     .filter((l) => l.modelType === RecordActionModelType.TRANSACTION_PURCHASE)
-    .map((l) => l.modelId);
+    .map((l) => l.parentId);
   const existSalesIds = ledgers
     .filter((l) => l.modelType === RecordActionModelType.TRANSACTION_SALES)
-    .map((l) => l.modelId);
+    .map((l) => l.parentId);
   const existSellIds = ledgers
     .filter((l) => l.modelType === RecordActionModelType.TRANSACTION_SELL)
-    .map((l) => l.modelId);
+    .map((l) => l.parentId);
   const [purchases, sales, sells] = await Promise.all([
     prisma.transactionPurchase.findMany({
       include: {
