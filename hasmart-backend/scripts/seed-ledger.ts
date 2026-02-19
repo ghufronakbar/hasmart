@@ -360,6 +360,6 @@ async function ledgerSeed() {
   console.log("Ledger Seed Completed");
 }
 
-console.log("Ledger Seed");
-ledgerSeed();
-console.log("done");
+if (require.main === module) {
+  ledgerSeed();
+}

@@ -563,7 +563,9 @@ const seed = async () => {
   }
 };
 
-seed().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (require.main === module) {
+  seed().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

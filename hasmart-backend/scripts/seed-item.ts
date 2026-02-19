@@ -497,7 +497,9 @@ const seed = async () => {
   console.log("Seed Item Completed.");
 };
 
-seed().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (require.main === module) {
+  seed().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
