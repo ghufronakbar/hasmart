@@ -937,26 +937,10 @@ export default function PointOfSalesPage() {
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                    <AlertDialogCancel>Batal</AlertDialogCancel>
-                                    <AlertDialogAction onClick={(e) => {
-                                        e.preventDefault(); // Prevent auto-close
-                                        form.handleSubmit((values) => onSubmit(values, false))();
-                                    }}
-                                        className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
 
-                                    >
-                                        Bayar Saja
-                                    </AlertDialogAction>
-                                    <AlertDialogAction
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            form.handleSubmit((values) => onSubmit(values, true))();
-                                        }}
-                                        disabled={isPrintingTransaction}
-                                    >
-                                        {isPrintingTransaction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
-                                        Bayar & Cetak
-                                    </AlertDialogAction>
+
+
+
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
