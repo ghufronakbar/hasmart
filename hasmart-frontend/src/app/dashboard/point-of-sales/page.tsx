@@ -128,6 +128,13 @@ export default function PointOfSalesPage() {
     const dailyReceiptRef = useRef<HTMLDivElement>(null);
     const [dailyReceiptData, setDailyReceiptData] = useState<SalesReceipt | null>(null);
     const [isPrintingDaily, setIsPrintingDaily] = useState(false);
+    const [reportDate, setReportDate] = useState(() => {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, "0");
+        const d = String(now.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+    });
 
     const handlePrintDaily = useReactToPrint({
         contentRef: dailyReceiptRef,
@@ -151,8 +158,9 @@ export default function PointOfSalesPage() {
         if (!branch?.id) return;
         setIsPrintingDaily(true);
         try {
+            const selectedDate = new Date(reportDate + "T00:00:00");
             const res = await receiptService.getDailySales({
-                date: new Date(),
+                date: selectedDate,
                 branchId: branch.id,
             });
             if (res.data) {
@@ -625,18 +633,26 @@ export default function PointOfSalesPage() {
                                 </div>
                             </div>
                         </div>
-                        <div className="w-fit">
+                        <div className="w-fit flex flex-col gap-2">
+                            <div className="flex gap-2 items-center">
+                                <Input
+                                    type="date"
+                                    value={reportDate}
+                                    onChange={(e) => setReportDate(e.target.value)}
+                                    className="h-10 w-[160px]"
+                                />
+                                <Button
+                                    className="w-fit"
+                                    variant="outline"
+                                    onClick={handleFetchAndPrintDaily}
+                                    disabled={isPrintingDaily}
+                                >
+                                    {isPrintingDaily ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Copy className="mr-2 h-4 w-4" />}
+                                    Cetak Laporan
+                                </Button>
+                            </div>
                             <Button
-                                className="w-fit"
-                                variant="outline"
-                                onClick={handleFetchAndPrintDaily}
-                                disabled={isPrintingDaily}
-                            >
-                                {isPrintingDaily ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Copy className="mr-2 h-4 w-4" />}
-                                Cetak Laporan Hari Ini
-                            </Button>
-                            <Button
-                                className="w-full mt-2"
+                                className="w-full"
                                 variant="outline"
                                 onClick={() => setIsCashFlowOpen(true)}
                             >
