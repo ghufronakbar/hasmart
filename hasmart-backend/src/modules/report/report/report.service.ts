@@ -827,9 +827,10 @@ export class ReportService extends BaseService {
     if (filter?.dateEnd) dateFilter.lte = new Date(filter.dateEnd);
     const hasDateFilter = filter?.dateStart || filter?.dateEnd;
 
-    // Helper: format date to YYYY-MM-DD string
+    // Helper: format date to YYYY-MM-DD string in WIB (UTC+7)
+    const WIB_OFFSET_MS = 7 * 60 * 60 * 1000; // UTC+7 in milliseconds
     const toDateKey = (d: Date): string => {
-      const dt = new Date(d);
+      const dt = new Date(new Date(d).getTime() + WIB_OFFSET_MS);
       return dt.toISOString().split("T")[0];
     };
 
@@ -1103,6 +1104,7 @@ export class ReportService extends BaseService {
     };
 
     reportData.push(totalItem);
+    console.log(JSON.stringify(reportData, null, 2));
 
     if (query.exportAs === "pdf" || query.exportAs === "preview") {
       const buffer = await this.pdfService.generateOverallReport(
