@@ -14,7 +14,8 @@
     "seed:pos": "ts-node --transpile-only ./scripts/seed-point-of-sales.ts",
     "seed:sales": "ts-node --transpile-only ./scripts/seed-sales.ts",
     "seed:ledger": "ts-node --transpile-only ./scripts/seed-ledger.ts",
-    "seed:all": "npm run seed:item && npm run seed:purchase && npm run seed:pos && npm run seed:sales && npm run seed:ledger"
+    "seed:fix-purchase": "ts-node --transpile-only ./scripts/seed-fix-purchase.ts",
+    "seed:all": "npm run seed:item && npm run seed:purchase && npm run seed:pos && npm run seed:sales && npm run seed:ledger && npm run seed:fix-purchase"
   },
   "keywords": [],
   "author": "",
