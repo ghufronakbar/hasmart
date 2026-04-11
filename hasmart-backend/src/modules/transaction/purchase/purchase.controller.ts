@@ -68,4 +68,10 @@ export class PurchaseController extends BaseController {
     const result = await this.service.deletePurchase(params.purchaseId, userId);
     return this.sendOk(req, res, result);
   };
+  getPriceHistoryByItem = async (req: Request, res: Response) => {
+    const masterItemId = parseInt(req.params.masterItemId, 10);
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+    const data = await this.service.getPriceHistoryByItem(masterItemId, limit);
+    return this.sendOk(req, res, data);
+  };
 }

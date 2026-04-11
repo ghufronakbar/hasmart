@@ -42,6 +42,15 @@ export class PurchaseRouter extends BaseRouter {
     );
 
     this.router.get(
+      "/item/:masterItemId/price-history",
+      useAuth(this.jwtService),
+      asyncHandler(
+        async (req, res) =>
+          await this.controller.getPriceHistoryByItem(req, res),
+      ),
+    );
+
+    this.router.get(
       "/:purchaseId",
       useAuth(this.jwtService),
       validateHandler({ params: PurchaseParamsSchema }),

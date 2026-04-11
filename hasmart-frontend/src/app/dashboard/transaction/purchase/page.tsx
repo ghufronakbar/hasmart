@@ -124,9 +124,100 @@ import { useModEnter } from "@/hooks/function/use-mod-enter";
 import { useAccessControl, UserAccess } from "@/hooks/use-access-control";
 import { itemService } from "@/services";
 import { useF2 } from "@/hooks/function/use-f2";
+import { useItemPriceHistory } from "@/hooks/transaction/use-purchase";
 
 type CreatePurchaseFormValues = z.infer<typeof createPurchaseSchema>;
 type PurchaseItemFormValues = z.infer<typeof purchaseItemSchema>;
+
+// --- Price History Popup Component ---
+function PriceHistoryPopup({
+    masterItemId,
+    onSelectPrice,
+}: {
+    masterItemId: number;
+    onSelectPrice: (price: number) => void;
+}) {
+    const { data, isLoading } = useItemPriceHistory(masterItemId, true);
+    const history = data?.data ?? [];
+
+    const fmt = (val: string | number) =>
+        new Intl.NumberFormat("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+            typeof val === "string" ? parseFloat(val) : val
+        );
+
+    return (
+        <div
+            className="absolute z-50 top-full left-0 mt-1 w-max min-w-full max-w-[520px] bg-white border border-border rounded-lg shadow-xl overflow-hidden"
+            onMouseDown={(e) => e.preventDefault()} // Keep focus on input
+        >
+            <div className="px-3 py-2 bg-muted/60 border-b flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Histori Harga Beli</span>
+                {isLoading && <span className="text-xs text-muted-foreground">(memuat...)</span>}
+            </div>
+            {!isLoading && history.length === 0 && (
+                <div className="px-4 py-3 text-xs text-muted-foreground">Belum ada histori harga untuk barang ini.</div>
+            )}
+            {history.length > 0 && (
+                <div className="overflow-x-auto max-h-56 overflow-y-auto">
+                    <table className="w-full text-xs">
+                        <thead>
+                            <tr className="bg-muted/40 border-b">
+                                <th className="px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">Tanggal</th>
+                                <th className="px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">Pemasok</th>
+                                <th className="px-3 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Harga Beli</th>
+                                <th className="px-3 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Disk %</th>
+                                <th className="px-3 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Diskon</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {history.map((row, i) => {
+                                const price = parseFloat(row.purchasePrice);
+                                // Calculate total discount % (cascading)
+                                let totalDiscPct = 0;
+                                let running = price;
+                                let totalDiscAmt = 0;
+                                row.transactionPurchaseDiscounts.forEach(d => {
+                                    const pct = parseFloat(d.percentage);
+                                    const amt = running * (pct / 100);
+                                    totalDiscAmt += amt;
+                                    running -= amt;
+                                    totalDiscPct += pct;
+                                });
+                                return (
+                                    <tr
+                                        key={row.id}
+                                        className={cn(
+                                            "border-b last:border-0 cursor-pointer transition-colors",
+                                            i % 2 === 0 ? "bg-white hover:bg-primary/5" : "bg-muted/20 hover:bg-primary/5"
+                                        )}
+                                        onMouseDown={() => onSelectPrice(price)}
+                                        title="Klik untuk menggunakan harga ini"
+                                    >
+                                        <td className="px-3 py-1.5 whitespace-nowrap">
+                                            {format(new Date(row.transactionPurchase.transactionDate), "dd/MM/yyyy")}
+                                        </td>
+                                        <td className="px-3 py-1.5 font-medium whitespace-nowrap">
+                                            {row.transactionPurchase.masterSupplier.name}
+                                        </td>
+                                        <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                            {fmt(price)}
+                                        </td>
+                                        <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                            {row.transactionPurchaseDiscounts.length > 0 ? fmt(totalDiscPct) : "0,00"}
+                                        </td>
+                                        <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                            {fmt(totalDiscAmt)}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
 
 
 
@@ -269,6 +360,10 @@ export default function PurchasePage() {
 
     // --- Create Form ---
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+    // Track which item row's price history popup is open (index)
+    const [priceHistoryIndex, setPriceHistoryIndex] = useState<number | null>(null);
+    // Track which masterItemId to fetch history for
+    const [priceHistoryItemId, setPriceHistoryItemId] = useState<number | null>(null);
 
     const form = useForm<CreatePurchaseFormValues>({
         resolver: zodResolver(createPurchaseSchema) as Resolver<CreatePurchaseFormValues>,
@@ -976,11 +1071,38 @@ export default function PurchasePage() {
                                                                 </FormItem>
                                                             )} />
                                                         </div>
-                                                        <div className="col-span-3">
+                                                        <div className="col-span-3 relative">
                                                             <FormField control={form.control} name={`items.${index}.purchasePrice`} render={({ field }) => (
                                                                 <FormItem>
                                                                     <FormLabel className="text-xs">Harga Beli</FormLabel>
-                                                                    <FormControl><Input type="number" {...field} /></FormControl>
+                                                                    <FormControl>
+                                                                        <Input
+                                                                            type="number"
+                                                                            {...field}
+                                                                            onFocus={() => {
+                                                                                const itemId = form.getValues(`items.${index}.masterItemId`);
+                                                                                if (itemId && itemId > 0) {
+                                                                                    setPriceHistoryItemId(itemId);
+                                                                                    setPriceHistoryIndex(index);
+                                                                                }
+                                                                            }}
+                                                                            onBlur={(e) => {
+                                                                                field.onBlur();
+                                                                                // Delay hide to allow click on popup rows
+                                                                                setTimeout(() => setPriceHistoryIndex(prev => prev === index ? null : prev), 200);
+                                                                            }}
+                                                                        />
+                                                                    </FormControl>
+                                                                    {/* Price History Popup */}
+                                                                    {priceHistoryIndex === index && priceHistoryItemId === form.getValues(`items.${index}.masterItemId`) && (
+                                                                        <PriceHistoryPopup
+                                                                            masterItemId={priceHistoryItemId}
+                                                                            onSelectPrice={(price) => {
+                                                                                field.onChange(price);
+                                                                                setPriceHistoryIndex(null);
+                                                                            }}
+                                                                        />
+                                                                    )}
                                                                 </FormItem>
                                                             )} />
                                                         </div>

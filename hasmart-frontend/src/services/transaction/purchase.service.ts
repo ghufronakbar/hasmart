@@ -96,4 +96,26 @@ export const purchaseService = {
     );
     return response.data;
   },
+
+  getItemPriceHistory: async (masterItemId: number, limit = 20) => {
+    const response = await axiosInstance.get<{ data: PriceHistoryItem[] }>(
+      `/transaction/purchase/item/${masterItemId}/price-history`,
+      { params: { limit } },
+    );
+    return response.data;
+  },
 };
+
+export interface PriceHistoryItem {
+  id: number;
+  purchasePrice: string;
+  qty: number;
+  recordedConversion: number;
+  transactionPurchaseDiscounts: { percentage: string; orderIndex: number }[];
+  transactionPurchase: {
+    id: number;
+    transactionDate: string;
+    invoiceNumber: string;
+    masterSupplier: { id: number; code: string; name: string };
+  };
+}

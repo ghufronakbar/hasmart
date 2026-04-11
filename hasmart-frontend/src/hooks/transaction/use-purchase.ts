@@ -146,3 +146,11 @@ export function useDeletePurchase() {
     },
   });
 }
+export function useItemPriceHistory(masterItemId: number | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["purchase", "item-price-history", masterItemId],
+    queryFn: () => purchaseService.getItemPriceHistory(masterItemId!),
+    enabled: !!masterItemId && enabled,
+    staleTime: 30_000, // 30s cache
+  });
+}

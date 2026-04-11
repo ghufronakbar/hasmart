@@ -680,6 +680,33 @@ export class PurchaseService extends BaseService {
     return this.getPurchaseById(purchase.id);
   };
 
+  getPriceHistoryByItem = async (masterItemId: number, limit = 20) => {
+    const items = await this.prisma.transactionPurchaseItem.findMany({
+      where: {
+        masterItemId,
+        deletedAt: null,
+        transactionPurchase: { deletedAt: null },
+      },
+      orderBy: { transactionPurchase: { transactionDate: "desc" } },
+      take: limit,
+      include: {
+        transactionPurchase: {
+          select: {
+            id: true,
+            transactionDate: true,
+            invoiceNumber: true,
+            masterSupplier: { select: { id: true, code: true, name: true } },
+          },
+        },
+        transactionPurchaseDiscounts: {
+          where: { deletedAt: null },
+          orderBy: { orderIndex: "asc" },
+        },
+      },
+    });
+    return items;
+  };
+
   deletePurchase = async (id: number, userId: number) => {
     // 1. Ambil data SEBELUM dihapus (PENTING)
     const existing = await this.prisma.transactionPurchase.findFirst({
