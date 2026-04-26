@@ -831,7 +831,7 @@ export default function SalesPage() {
                                         {/* Barcode Scanner Input */}
 
 
-                                        <div className="space-y-4">
+                                        <div className="">
                                             {fields.map((field, index) => {
                                                 // Use watchedItems for reactivity
                                                 const currentItem = watchedItems?.[index] || {};
@@ -846,7 +846,10 @@ export default function SalesPage() {
                                                 const bgClass = isMissingCategory ? "bg-red-500/10" : "bg-muted/10";
 
                                                 return (
-                                                    <div key={field.id} className={`grid grid-cols-12 gap-4 items-start border p-4 rounded-lg ${bgClass} relative`}>
+                                                    <div key={field.id} className={`grid grid-cols-12 gap-4 items-start border pr-4 pl-12 py-2 relative transition-colors ${bgClass}`}>
+                                                        <div className="absolute left-3 top-9 flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                                                            {index + 1}
+                                                        </div>
                                                         <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-red-500" onClick={() => remove(index)}>
                                                             <X className="h-4 w-4" />
                                                         </Button>

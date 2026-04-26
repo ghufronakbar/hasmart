@@ -983,7 +983,7 @@ export default function PurchasePage() {
                                         {/* Barcode Scanner Input */}
 
 
-                                        <div className="space-y-4">
+                                        <div className="">
                                             {fields.map((field, index) => {
                                                 const selectedItemId = form.getValues(`items.${index}.masterItemId`);
                                                 const selectedItem = itemOptions.find(i => i.id === selectedItemId);
@@ -998,9 +998,12 @@ export default function PurchasePage() {
 
                                                 return (
                                                     <div key={field.id} className={cn(
-                                                        "grid grid-cols-12 gap-4 items-start border p-4 rounded-lg relative transition-colors",
+                                                        "grid grid-cols-12 gap-4 items-start border pr-4 pl-12 py-2 relative transition-colors",
                                                         isMissingCategory ? "bg-red-500/10 border-red-200" : "bg-muted/10"
                                                     )}>
+                                                        <div className="absolute left-3 top-9 flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                                                            {index + 1}
+                                                        </div>
                                                         <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-red-500" onClick={() => remove(index)}>
                                                             <X className="h-4 w-4" />
                                                         </Button>
@@ -1147,7 +1150,7 @@ export default function PurchasePage() {
                                                         </div>
 
                                                         {/* Row Calculation Info */}
-                                                        <div className="col-span-12 text-right text-xs text-muted-foreground">
+                                                        <div className="col-span-12 -mt-4 text-right text-xs text-muted-foreground">
                                                             {calculations.itemCalculations?.[index] && (
                                                                 <span>
                                                                     Net: {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(calculations.itemCalculations[index].netTotal)}

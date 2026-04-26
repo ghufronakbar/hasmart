@@ -1025,7 +1025,7 @@ export default function SellReturnPage() {
                                                     </div>
                                                 </div>
 
-                                                <div className="space-y-4">
+                                                <div className="">
                                                     {fields.map((field, index) => {
                                                         const selectedItemId = form.getValues(`items.${index}.masterItemId`);
                                                         const selectedItem = itemOptions.find(i => i.id === selectedItemId);
@@ -1033,7 +1033,10 @@ export default function SellReturnPage() {
                                                         const currentDiscounts = form.getValues(`items.${index}.discounts`) || [];
 
                                                         return (
-                                                            <div key={field.id} className="grid grid-cols-12 gap-4 items-start border p-4 rounded-lg bg-muted/10 relative">
+                                                            <div key={field.id} className="grid grid-cols-12 gap-4 items-start border pr-4 pl-12 py-2 relative transition-colors">
+                                                                <div className="absolute left-3 top-9 flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                                                                    {index + 1}
+                                                                </div>
                                                                 <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-red-500" onClick={() => remove(index)}>
                                                                     <X className="h-4 w-4" />
                                                                 </Button>
