@@ -106,7 +106,7 @@ const createPurchaseReturnSchema = z.object({
     taxPercentage: z.coerce.number().min(0).max(100).default(0),
     items: z.array(purchaseReturnItemSchema).min(1, "Minimal 1 item"),
     invoiceNumber: z.string("Invoice wajib diisi").min(1, "Invoice Wajib diisi"),
-    originalInvoiceNumber: z.string("Invoice Original wajib diisi").min(1, "Invoice Original Wajib diisi"),
+    originalInvoiceNumber: z.string().optional(),
 });
 
 
@@ -546,7 +546,7 @@ export default function PurchaseReturnPage() {
 
     // --- Item Selection Logic ---
     const handleItemSelect = (index: number, itemId: number) => {
-        const item = items?.data?.find(i => i.id === itemId);
+        const item = itemOptions.find(i => i.id === itemId);
         if (item && item.masterItemVariants?.length > 0) {
             form.setValue(`items.${index}.masterItemId`, itemId);
             form.setValue(`items.${index}.masterItemVariantId`, 0); // Reset variant
@@ -891,6 +891,18 @@ export default function PurchaseReturnPage() {
                                         setSubmittedInvoiceQuery(searchInvoiceQuery);
                                     }}>Cek Invoice</Button>
                                 </div>
+
+                                <div className="flex items-center gap-4 w-full">
+                                    <div className="h-[1px] bg-border flex-1" />
+                                    <span className="text-xs text-muted-foreground uppercase font-semibold">Atau</span>
+                                    <div className="h-[1px] bg-border flex-1" />
+                                </div>
+
+                                <div className="flex justify-center">
+                                    <Button variant="ghost" className="text-primary hover:text-primary hover:bg-primary/5" onClick={() => setIsInvoiceVerified(true)}>
+                                        Tambah Tanpa Invoice Original
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     ) : (
@@ -905,9 +917,14 @@ export default function PurchaseReturnPage() {
                                                     <FormLabel>Invoice Original</FormLabel>
                                                     <FormControl>
                                                         <div className="flex gap-2">
-                                                            <Input placeholder="PURCHASE-XXX" {...field} readOnly className="bg-muted" />
-                                                            {!editingId && (
+                                                            <Input placeholder="PURCHASE-XXX (Opsional)" {...field} readOnly={!!invoiceItems.length || !!editingId} className={!!invoiceItems.length || !!editingId ? "bg-muted" : ""} />
+                                                            {(!editingId && !!invoiceItems.length) && (
                                                                 <Button type="button" variant="outline" size="icon" onClick={handleResetVerification} title="Ganti Invoice">
+                                                                    <X className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
+                                                            {(!editingId && !invoiceItems.length) && (
+                                                                <Button type="button" variant="outline" size="icon" onClick={() => setIsInvoiceVerified(false)} title="Kembali">
                                                                     <X className="h-4 w-4" />
                                                                 </Button>
                                                             )}
@@ -936,7 +953,7 @@ export default function PurchaseReturnPage() {
                                                     inputValue={searchSupplier}
                                                     onInputChange={setSearchSupplier}
                                                     renderLabel={(item) => <div className="flex flex-col"><span className="font-semibold">{item.code} ({item.name})</span><span className="text-[10px] text-muted-foreground">{(item as unknown as { masterItemCategory?: { name: string } }).masterItemCategory?.name}</span></div>}
-                                                    disabled // Readonly because tied to invoice
+                                                    disabled={!!invoiceItems.length || !!editingId} // Readonly because tied to invoice
                                                     filterString={searchSupplier}
                                                 />
                                                 <FormMessage />

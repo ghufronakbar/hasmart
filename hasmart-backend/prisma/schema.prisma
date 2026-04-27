@@ -506,8 +506,8 @@ model TransactionPurchaseDiscount {
 model TransactionPurchaseReturn {
   id Int @id @default(autoincrement()) @map("id")
 
-  transactionPurchaseId Int                 @map("transaction_purchase_id")
-  transactionPurchase   TransactionPurchase @relation(fields: [transactionPurchaseId], references: [id])
+  transactionPurchaseId Int?                @map("transaction_purchase_id")
+  transactionPurchase   TransactionPurchase? @relation(fields: [transactionPurchaseId], references: [id])
 
   invoiceNumber   String   @map("invoice_number") // ex: TP-2026-001 (ref number)
   transactionDate DateTime @map("transaction_date") // ex: 2026-01-26 inputable

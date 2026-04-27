@@ -14,7 +14,7 @@ const PurchaseReturnItemSchema = z.object({
 
 export const PurchaseReturnBodySchema = z.object({
   invoiceNumber: z.string().min(1),
-  originalInvoiceNumber: z.string().min(1),
+  originalInvoiceNumber: z.string().optional().default(""),
   transactionDate: z.coerce.date(),
   dueDate: z.coerce.date(),
   masterSupplierId: z.number().int().positive(),

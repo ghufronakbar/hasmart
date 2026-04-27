@@ -60,7 +60,7 @@ export interface CreatePurchaseReturnDTO {
   notes?: string | null;
   taxPercentage: number;
   items: CreatePurchaseReturnItemDTO[];
-  originalInvoiceNumber: string;
+  originalInvoiceNumber?: string;
 }
 
 export type UpdatePurchaseReturnDTO = CreatePurchaseReturnDTO;
